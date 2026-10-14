@@ -28,14 +28,26 @@ export type HiitSpec =
   | { kind: 'intervals'; workSec: number; restSec: number; rounds: number; items: string[] }
   | { kind: 'amrap'; minutes: number; items: string[] };
 
+/** En plats i passet. Baslyft byts per block, komplement roterar varje pass. */
+export interface SlotDef {
+  slot: string;
+  role: 'main' | 'accessory';
+  options: StrengthItem[];
+}
+
+export interface PlanItem extends StrengthItem {
+  slot: string;
+  role: 'main' | 'accessory';
+}
+
 export interface DayDef {
   id: DayId;
   title: string;
   focus: string;
   warmup: string;
-  strength: StrengthItem[];
-  hiitTitle: string;
-  hiit: HiitSpec;
+  slots: SlotDef[];
+  /** Alla alternativ har samma format och längd, bara olika övningar */
+  hiitOptions: HiitSpec[];
 }
 
 export interface SetLog {
@@ -73,6 +85,14 @@ export interface Session {
   endedAt?: number;
   status: 'active' | 'done';
   deload: boolean;
+  /** Blocknummer (0-baserat) när passet startades */
+  block: number;
+  /** Övningarna som valdes för just det här passet */
+  items: PlanItem[];
+  /** Vald variant per plats, för komplementövningar */
+  variants: Record<string, number>;
+  hiitSpec: HiitSpec;
+  hiitVariant: number;
   strength: ExerciseLog[];
   hiit?: HiitLog;
   changes?: ProgressionChange[];
@@ -94,8 +114,11 @@ export interface Settings {
   barWeight: number;
   plates: number[];
   leadInSec: number;
-  deloadNext: boolean;
+  /** Antal återstående deload-pass (0 = ingen deload pågår) */
+  deloadRemaining: number;
   lastDeloadAt: number | null;
+  /** Aktuellt block för baslyften. Ökar när en deload är klar. */
+  blockIndex: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -103,6 +126,7 @@ export const DEFAULT_SETTINGS: Settings = {
   barWeight: 20,
   plates: [25, 20, 15, 10, 5, 2.5, 1.25],
   leadInSec: 5,
-  deloadNext: false,
+  deloadRemaining: 0,
   lastDeloadAt: null,
+  blockIndex: 0,
 };

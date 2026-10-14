@@ -10,7 +10,7 @@ import {
   getSettings,
   listDoneSessions,
   saveSession,
-  setSetting,
+  setDeload,
   startSession,
   suggestNextDay,
 } from './db';
@@ -146,7 +146,7 @@ export function App() {
           states={states}
           onStart={onStart}
           onResume={onResume}
-          onSetDeloadNext={(on) => void setSetting('deloadNext', on)}
+          onSetDeload={(on) => void setDeload(on)}
         />
       )}
       {tab === 'history' && <History sessions={done} />}

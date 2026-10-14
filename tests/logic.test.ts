@@ -12,7 +12,7 @@ import {
 import { TimerEngine } from '../src/logic/timerEngine';
 import type { SoundId } from '../src/logic/timerPlan';
 import type { SetLog, StrengthItem } from '../src/types';
-import { DAYS, restText, targetText } from '../src/data/program';
+import { DAYS, EXERCISES, hiitMinutes, restText, targetText } from '../src/data/program';
 
 const squat: StrengthItem = {
   exerciseId: 'squat', sets: 4, repsMin: 5, repsMax: 5, restSec: 150, progression: { kind: 'weight', inc: 5 },
@@ -135,14 +135,27 @@ describe('timerplaner', () => {
     expect(fmtClock(59001)).toBe('1:00');
     expect(fmtClock(0)).toBe('0:00');
   });
-  it('programmet: totaltid per pass ryms i 30–40 min inkl. uppvärmning', () => {
+  it('programmet: HIIT-alternativ har samma format och längd, och poolerna är konsekventa', () => {
     for (const d of DAYS) {
-      const h = d.hiit;
-      const mins =
-        h.kind === 'intervals' ? (h.items.length * h.rounds * (h.workSec + h.restSec) - h.restSec) / 60 : h.minutes;
+      const [first, ...rest] = d.hiitOptions;
+      const mins = hiitMinutes(first);
       expect(mins).toBeGreaterThanOrEqual(10);
       expect(mins).toBeLessThanOrEqual(15);
+      expect(rest.length).toBeGreaterThanOrEqual(1);
+      for (const h of rest) {
+        expect(h.kind).toBe(first.kind);
+        expect(hiitMinutes(h)).toBe(mins);
+        expect(h.items.length).toBe(first.items.length);
+      }
+      for (const slot of d.slots) {
+        expect(slot.options.length).toBeGreaterThanOrEqual(2);
+        for (const o of slot.options) expect(EXERCISES[o.exerciseId]).toBeDefined();
+      }
+      expect(d.slots.some((x) => x.role === 'main')).toBe(true);
     }
+    // varje övnings-id används bara på ett ställe
+    const all = DAYS.flatMap((d) => d.slots.flatMap((s) => s.options.map((o) => o.exerciseId)));
+    expect(new Set(all).size).toBe(all.length);
     expect(targetText(4, 5, 5)).toBe('4 × 5');
     expect(targetText(3, 8, 10)).toBe('3 × 8–10');
     expect(restText(150)).toBe('2–3 min');

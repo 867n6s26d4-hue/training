@@ -142,3 +142,5 @@ p { margin: 0; }
 .toast { position: fixed; left: 16px; right: 16px; bottom: calc(80px + env(safe-area-inset-bottom)); background: var(--danger); color: #1b0605; padding: 12px 14px; border-radius: 12px; font-weight: 700; z-index: 60; }
 
 @media (prefers-reduced-motion: no-preference) { .btn, .step, .check { transition: transform 0.06s; } }
+
+.btn.swap { align-self: flex-start; min-height: 36px; padding: 6px 12px; font-size: 14px; color: var(--muted); }

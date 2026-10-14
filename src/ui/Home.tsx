@@ -11,10 +11,10 @@ interface Props {
   states: Record<string, ExerciseState | undefined>;
   onStart: (day: DayId) => void;
   onResume: () => void;
-  onSetDeloadNext: (on: boolean) => void;
+  onSetDeload: (on: boolean) => void;
 }
 
-export function Home({ active, done, next, deloadSuggested, settings, onStart, onResume, onSetDeloadNext }: Props) {
+export function Home({ active, done, next, deloadSuggested, settings, onStart, onResume, onSetDeload }: Props) {
   const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
   const thisWeek = done.filter((s) => s.startedAt >= weekAgo).length;
   const nextDay = getDay(next);
@@ -41,8 +41,10 @@ export function Home({ active, done, next, deloadSuggested, settings, onStart, o
           <div class="hero-title">
             Pass {nextDay.id} · {nextDay.title}
           </div>
-          <div class="muted">{nextDay.focus} · ca {estimateMinutes(nextDay)} min</div>
-          {settings.deloadNext && <div class="tag warn">Körs som deload (ca 60 % volym)</div>}
+          <div class="muted">
+            {nextDay.focus} · ca {estimateMinutes(nextDay)} min · block {settings.blockIndex + 1}
+          </div>
+          {settings.deloadRemaining > 0 && <div class="tag warn">Deload (ca 60 % volym), {settings.deloadRemaining} pass kvar</div>}
           <button class="btn primary xl" onClick={() => onStart(next)}>
             Starta pass {nextDay.id}
           </button>
@@ -52,15 +54,15 @@ export function Home({ active, done, next, deloadSuggested, settings, onStart, o
       {!active && deloadSuggested && (
         <section class="callout warn">
           Det har gått minst fem veckor sedan senaste deload. Ett lättare pass med färre set ger återhämtning.
-          <button class="btn small" onClick={() => onSetDeloadNext(true)}>
-            Kör nästa pass som deload
+          <button class="btn small" onClick={() => onSetDeload(true)}>
+            Starta deload (3 pass)
           </button>
         </section>
       )}
-      {!active && settings.deloadNext && (
+      {!active && settings.deloadRemaining > 0 && (
         <section class="callout">
-          Nästa pass körs som deload.
-          <button class="btn small" onClick={() => onSetDeloadNext(false)}>
+          Deload pågår: {settings.deloadRemaining} pass kvar. När den är klar byts baslyften till nästa block.
+          <button class="btn small" onClick={() => onSetDeload(false)}>
             Ångra
           </button>
         </section>

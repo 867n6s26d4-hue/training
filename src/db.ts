@@ -4,12 +4,13 @@ import {
   type DayId,
   type ExerciseLog,
   type ExerciseState,
+  type PlanItem,
   type ProgressionChange,
   type Session,
   type SetLog,
   type Settings,
 } from './types';
-import { DAYS, getDay } from './data/program';
+import { DAYS, getDay, getSlot, pickOption } from './data/program';
 import { deloadSets, evaluateProgression, plannedReps } from './logic/progression';
 
 interface SettingRow {
@@ -24,11 +25,22 @@ export class AppDB extends Dexie {
 
   constructor(name = 'garagepasset') {
     super(name);
-    this.version(1).stores({
+    const stores = {
       sessions: '++id, dayId, status, startedAt',
       exerciseState: 'exerciseId',
       settings: 'key',
-    });
+    };
+    this.version(1).stores(stores);
+    // v2: pass bär nu sina egna övningar (block och rotation). Pågående pass i gammalt format kastas.
+    this.version(2)
+      .stores(stores)
+      .upgrade(async (tx) => {
+        const t = tx.table('sessions');
+        const old = await t.filter((x: Partial<Session>) => !x.items).toArray();
+        for (const x of old) {
+          if (x.status === 'active') await t.delete(x.id);
+        }
+      });
   }
 }
 
@@ -55,26 +67,80 @@ export async function setSetting<K extends keyof Settings>(key: K, value: Settin
 
 /* ---------- pass ---------- */
 
+export interface BuildOptions {
+  deload: boolean;
+  block: number;
+  /** Antal avslutade pass av den här sorten, styr rotationen av komplementövningar och HIIT */
+  rotation: number;
+}
+
+type LastSets = Record<string, { sets: SetLog[]; level?: string } | undefined>;
+type States = Record<string, ExerciseState | undefined>;
+
+export function makeLog(item: PlanItem, states: States, lastSets: LastSets, deload: boolean): ExerciseLog {
+  const st = states[item.exerciseId];
+  const last = lastSets[item.exerciseId];
+  const n = deload ? deloadSets(item.sets) : item.sets;
+  const weight = st?.weight ?? null;
+  const sets: SetLog[] = [];
+  for (let i = 0; i < n; i++) {
+    sets.push({ weight, reps: plannedReps(item, weight, last?.sets[i]), done: false });
+  }
+  return { exerciseId: item.exerciseId, sets, level: st?.level ?? last?.level };
+}
+
 export function buildSession(
   dayId: DayId,
-  states: Record<string, ExerciseState | undefined>,
-  lastSets: Record<string, { sets: SetLog[]; level?: string } | undefined>,
-  deload: boolean,
+  states: States,
+  lastSets: LastSets,
+  opts: BuildOptions,
   now = Date.now(),
 ): Session {
   const day = getDay(dayId);
-  const strength: ExerciseLog[] = day.strength.map((item) => {
-    const st = states[item.exerciseId];
-    const last = lastSets[item.exerciseId];
-    const n = deload ? deloadSets(item.sets) : item.sets;
-    const weight = st?.weight ?? null;
-    const sets: SetLog[] = [];
-    for (let i = 0; i < n; i++) {
-      sets.push({ weight, reps: plannedReps(item, weight, last?.sets[i]), done: false });
-    }
-    return { exerciseId: item.exerciseId, sets, level: st?.level ?? last?.level };
-  });
-  return { dayId, startedAt: now, status: 'active', deload, strength };
+  const items: PlanItem[] = [];
+  const variants: Record<string, number> = {};
+  for (const slot of day.slots) {
+    const { item, variant } = pickOption(slot, opts.block, opts.rotation);
+    items.push({ ...item, slot: slot.slot, role: slot.role });
+    variants[slot.slot] = variant;
+  }
+  const hiitVariant = opts.rotation % day.hiitOptions.length;
+  return {
+    dayId,
+    startedAt: now,
+    status: 'active',
+    deload: opts.deload,
+    block: opts.block,
+    items,
+    variants,
+    hiitSpec: day.hiitOptions[hiitVariant],
+    hiitVariant,
+    strength: items.map((it) => makeLog(it, states, lastSets, opts.deload)),
+  };
+}
+
+/** Byt en komplementövning mot nästa alternativ. Kräver att inga set är markerade som klara. */
+export function swapAccessory(session: Session, idx: number, states: States, lastSets: LastSets): Session {
+  const cur = session.items[idx];
+  if (!cur || cur.role !== 'accessory') return session;
+  if (session.strength[idx].sets.some((x) => x.done)) return session;
+  const slot = getSlot(session.dayId, cur.slot);
+  const variant = ((session.variants[cur.slot] ?? 0) + 1) % slot.options.length;
+  const next: PlanItem = { ...slot.options[variant], slot: cur.slot, role: 'accessory' };
+  return {
+    ...session,
+    variants: { ...session.variants, [cur.slot]: variant },
+    items: session.items.map((x, i) => (i === idx ? next : x)),
+    strength: session.strength.map((x, i) => (i === idx ? makeLog(next, states, lastSets, session.deload) : x)),
+  };
+}
+
+/** Byt HIIT-upplägg mot nästa alternativ. Kräver att HIIT inte redan är loggad. */
+export function swapHiit(session: Session): Session {
+  if (session.hiit) return session;
+  const day = getDay(session.dayId);
+  const hiitVariant = (session.hiitVariant + 1) % day.hiitOptions.length;
+  return { ...session, hiitVariant, hiitSpec: day.hiitOptions[hiitVariant] };
 }
 
 export async function lastDoneSets(): Promise<Record<string, { sets: SetLog[]; level?: string }>> {
@@ -89,21 +155,28 @@ export async function lastDoneSets(): Promise<Record<string, { sets: SetLog[]; l
   return out;
 }
 
+export async function loadStates(): Promise<States> {
+  const rows = await db.exerciseState.toArray();
+  const states: States = {};
+  rows.forEach((r) => (states[r.exerciseId] = r));
+  return states;
+}
+
 export async function startSession(dayId: DayId, now = Date.now()): Promise<Session> {
   const existing = await getActiveSession();
   if (existing) return existing;
   const settings = await getSettings();
-  const stateRows = await db.exerciseState.toArray();
-  const states: Record<string, ExerciseState> = {};
-  stateRows.forEach((r) => (states[r.exerciseId] = r));
-  const deload = settings.deloadNext;
-  const session = buildSession(dayId, states, await lastDoneSets(), deload, now);
+  const rotation = (await db.sessions.where('status').equals('done').toArray()).filter((s) => s.dayId === dayId).length;
+  const deload = settings.deloadRemaining > 0;
+  const session = buildSession(
+    dayId,
+    await loadStates(),
+    await lastDoneSets(),
+    { deload, block: settings.blockIndex, rotation },
+    now,
+  );
   const id = await db.sessions.add(session);
   session.id = id;
-  if (deload) {
-    await setSetting('deloadNext', false);
-    await setSetting('lastDeloadAt', now);
-  }
   return session;
 }
 
@@ -126,9 +199,8 @@ export async function finishSession(id: number, now = Date.now()): Promise<Sessi
   const s = await db.sessions.get(id);
   if (!s) throw new Error('Passet finns inte');
   if (s.status === 'done') return s;
-  const day = getDay(s.dayId);
   const changes: ProgressionChange[] = [];
-  for (const item of day.strength) {
+  for (const item of s.items) {
     const log = s.strength.find((x) => x.exerciseId === item.exerciseId);
     if (!log) continue;
     const prev = await db.exerciseState.get(item.exerciseId);
@@ -153,7 +225,25 @@ export async function finishSession(id: number, now = Date.now()): Promise<Sessi
   }
   const done: Session = { ...s, status: 'done', endedAt: now, changes };
   await db.sessions.put(done);
+  if (s.deload) await advanceDeload(now);
   return done;
+}
+
+/** Ett deload-pass är klart. När sista passet är klart byts block för baslyften. */
+async function advanceDeload(now: number): Promise<void> {
+  const settings = await getSettings();
+  const remaining = Math.max(0, settings.deloadRemaining - 1);
+  await setSetting('deloadRemaining', remaining);
+  if (remaining === 0) {
+    await setSetting('blockIndex', settings.blockIndex + 1);
+    await setSetting('lastDeloadAt', now);
+  }
+}
+
+export const DELOAD_SESSIONS = 3;
+
+export async function setDeload(on: boolean): Promise<void> {
+  await setSetting('deloadRemaining', on ? DELOAD_SESSIONS : 0);
 }
 
 export async function listDoneSessions(): Promise<Session[]> {
@@ -174,7 +264,7 @@ const WEEK_MS = 7 * 24 * 3600 * 1000;
 /** Föreslå deload om det gått minst 5 veckor sedan senaste deload (eller första passet) */
 export async function deloadSuggested(now = Date.now()): Promise<boolean> {
   const settings = await getSettings();
-  if (settings.deloadNext) return false;
+  if (settings.deloadRemaining > 0) return false;
   const done = await listDoneSessions();
   if (done.length < 6) return false;
   const first = done[done.length - 1].startedAt;
@@ -212,7 +302,13 @@ export function validateExport(data: unknown): ExportFile {
     throw new Error('Exportfilen är ofullständig');
   }
   for (const s of d.sessions) {
-    if (!s || typeof s.startedAt !== 'number' || !['A', 'B', 'C'].includes(s.dayId) || !Array.isArray(s.strength)) {
+    if (
+      !s ||
+      typeof s.startedAt !== 'number' ||
+      !['A', 'B', 'C'].includes(s.dayId) ||
+      !Array.isArray(s.strength) ||
+      !Array.isArray(s.items)
+    ) {
       throw new Error('Exportfilen innehåller ett ogiltigt pass');
     }
   }

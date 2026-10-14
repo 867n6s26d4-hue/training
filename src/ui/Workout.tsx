@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { ExerciseLog, ExerciseState, HiitLog, Session, SetLog, Settings, StrengthItem } from '../types';
-import { getDay, getExercise, restText, targetText } from '../data/program';
+import { getDay, getExercise, hiitTitleFor, restText, targetText } from '../data/program';
 import { fmtKg } from '../logic/progression';
 import { platesPerSide } from '../logic/plates';
 import { buildRestPlan, fmtClock } from '../logic/timerPlan';
 import { engine } from '../timer';
 import { unlockAudio } from '../audio';
 import { keepScreenOn } from '../wakelock';
-import { lastDoneSets } from '../db';
+import { lastDoneSets, swapAccessory, swapHiit } from '../db';
 import { fmtTime, parseNum } from '../format';
 import { useInterval } from '../hooks';
 import { TimerScreen } from './TimerScreen';
@@ -36,6 +36,8 @@ function lastText(last: { sets: SetLog[] } | undefined, kind: string): string | 
 
 export function Workout({ session, states, settings, onChange, onFinish, onDiscard, onBack }: Props) {
   const day = getDay(session.dayId);
+  const hiit = session.hiitSpec;
+  const hiitTitle = hiitTitleFor(hiit);
   const [last, setLast] = useState<Last>({});
   const [hiitOpen, setHiitOpen] = useState(false);
   const [confirm, setConfirm] = useState<'finish' | 'discard' | null>(null);
@@ -115,7 +117,7 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
   };
 
   if (hiitOpen) {
-    return <TimerScreen title={day.hiitTitle} spec={day.hiit} leadInSec={settings.leadInSec} onClose={closeHiit} />;
+    return <TimerScreen title={hiitTitle} spec={hiit} leadInSec={settings.leadInSec} onClose={closeHiit} />;
   }
 
   const restState = engine.plan?.kind === 'rest' ? engine : null;
@@ -129,6 +131,7 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
         </button>
         <div class="topbar-title">
           Pass {day.id}
+          <span class="tag">Block {session.block + 1}</span>
           {session.deload && <span class="tag warn">Deload</span>}
         </div>
         <div class="muted tnum">{fmtTime(session.startedAt)}</div>
@@ -147,7 +150,7 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
       )}
 
       <h2 class="h2">Del 1 · Styrka</h2>
-      {day.strength.map((item, i) => {
+      {session.items.map((item, i) => {
         const def = getExercise(item.exerciseId);
         const ex = session.strength[i];
         const st = states[item.exerciseId];
@@ -169,6 +172,14 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
                 <div class="muted small-text">vila {restText(item.restSec)}</div>
               </div>
             </div>
+            {item.role === 'accessory' && !ex.sets.some((x) => x.done) && (
+              <button
+                class="btn ghost small swap"
+                onClick={() => onChange((s) => swapAccessory(s, i, states, last))}
+              >
+                Byt övning
+              </button>
+            )}
             {lt && <div class="muted small-text">Förra gången: {lt}</div>}
             {st?.suggestHarder && (
               <div class="hint">Alla set på toppen förra gången. Dags för en svårare variant.</div>
@@ -202,7 +213,7 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
                     />
                   )}
                   <Stepper
-                    label={def.repsSuffix ? `reps ${def.repsSuffix}` : 'reps'}
+                    label={def.repsSuffix ? `reps${def.repsSuffix}` : 'reps'}
                     value={set.reps}
                     step={1}
                     onChange={(v) => setSet(i, j, { reps: v })}
@@ -224,16 +235,16 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
 
       <h2 class="h2">Del 2 · Högintensivt</h2>
       <section class="card hiit">
-        <div class="ex-name">{day.hiitTitle}</div>
+        <div class="ex-name">{hiitTitle}</div>
         <ol class="hiit-list">
-          {day.hiit.items.map((it, k) => (
+          {hiit.items.map((it, k) => (
             <li key={k}>{it}</li>
           ))}
         </ol>
-        {day.hiit.kind === 'intervals' && (
+        {hiit.kind === 'intervals' && (
           <div class="muted small-text">
-            {day.hiit.rounds} varv × {day.hiit.items.length} övningar, {day.hiit.workSec} s arbete / {day.hiit.restSec} s vila
-            (ca {Math.round((day.hiit.rounds * day.hiit.items.length * (day.hiit.workSec + day.hiit.restSec)) / 60)} min)
+            {hiit.rounds} varv × {hiit.items.length} övningar, {hiit.workSec} s arbete / {hiit.restSec} s vila (ca{' '}
+            {Math.round((hiit.rounds * hiit.items.length * (hiit.workSec + hiit.restSec) - hiit.restSec) / 60)} min)
           </div>
         )}
         {session.hiit ? (
@@ -247,7 +258,12 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
           </div>
         ) : (
           <button class="btn primary xl" onClick={openHiit}>
-            Starta {day.hiit.kind === 'emom' ? 'EMOM' : day.hiit.kind === 'amrap' ? 'AMRAP' : 'intervaller'}
+            Starta {hiit.kind === 'emom' ? 'EMOM' : hiit.kind === 'amrap' ? 'AMRAP' : 'intervaller'}
+          </button>
+        )}
+        {!session.hiit && (
+          <button class="btn ghost small swap" onClick={() => onChange((s) => swapHiit(s))}>
+            Byt upplägg
           </button>
         )}
       </section>
