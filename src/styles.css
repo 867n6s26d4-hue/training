@@ -1,29 +1,29 @@
 :root {
-  /* Yta och text */
-  --bg: #0e1320;
-  --surface: #161d2e;
-  --surface2: #1d2638;
-  --line: #2a3450;
-  --text: #eef1f7;
-  --muted: #98a2b8;
+  /* Palett A: grafit och lime. Vila är terrakottarött. */
+  --bg: #0e0f11;
+  --surface: #17191c;
+  --surface2: #1f2226;
+  --line: #2c3036;
+  --text: #f1f3f0;
+  --muted: #9aa19a;
   /* Accent och status */
-  --accent: #f2622e;
-  --accent-ink: #1a0b05;
-  --ok: #3ecf8e;
-  --ok-ink: #052015;
-  --warn: #f5b942;
-  --danger: #ef5350;
-  --danger-ink: #1b0605;
-  --focus: #8ab4ff;
+  --accent: #c6f135;
+  --accent-ink: #11140a;
+  --ok: #c6f135;
+  --ok-ink: #11140a;
+  --warn: #ffb454;
+  --danger: #ff6b5e;
+  --danger-ink: #1b0705;
+  --focus: #c6f135;
   /* Vilofält under passet */
-  --rest-bg: #0b3a5b;
-  --rest-line: #1d6aa5;
+  --rest-bg: #3a1d12;
+  --rest-line: #c2502a;
   /* Timerskärmar: bakgrund (b) och förgrund (f) per läge */
-  --tb-lead: #334155;  --tf-lead: #ffffff;
-  --tb-work: #c2410c;  --tf-work: #ffffff;
-  --tb-rest: #0f766e;  --tf-rest: #ffffff;
-  --tb-amrap: #1d4ed8; --tf-amrap: #ffffff;
-  --tb-done: #15803d;  --tf-done: #ffffff;
+  --tb-lead: #1f2226;  --tf-lead: #f1f3f0;
+  --tb-work: #c6f135;  --tf-work: #11140a;
+  --tb-rest: #b24a24;  --tf-rest: #ffffff;
+  --tb-amrap: #0e3a46; --tf-amrap: #e9fdff;
+  --tb-done: #1b2a0c;  --tf-done: #c6f135;
   --radius: 16px;
   color-scheme: dark;
 }

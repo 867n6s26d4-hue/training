@@ -193,7 +193,7 @@ export function hiitTitleFor(spec: HiitSpec): string {
     case 'amrap':
       return `AMRAP ${spec.minutes} min`;
     case 'intervals':
-      return `${spec.rounds} varv · ${spec.workSec} s arbete / ${spec.restSec} s vila`;
+      return `${spec.rounds} varv · ${spec.workSec}/${spec.restSec} s`;
   }
 }
 
