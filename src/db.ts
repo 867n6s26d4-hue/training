@@ -162,6 +162,19 @@ export async function loadStates(): Promise<States> {
   return states;
 }
 
+/** Bygger nästa pass utan att spara det, för förhandsvisning på hemskärmen */
+export async function previewNext(dayId: DayId, now = Date.now()): Promise<Session> {
+  const settings = await getSettings();
+  const rotation = (await db.sessions.where('status').equals('done').toArray()).filter((s) => s.dayId === dayId).length;
+  return buildSession(
+    dayId,
+    await loadStates(),
+    await lastDoneSets(),
+    { deload: settings.deloadRemaining > 0, block: settings.blockIndex, rotation },
+    now,
+  );
+}
+
 export async function startSession(dayId: DayId, now = Date.now()): Promise<Session> {
   const existing = await getActiveSession();
   if (existing) return existing;

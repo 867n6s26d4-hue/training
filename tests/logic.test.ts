@@ -225,3 +225,45 @@ describe('passlängd', () => {
     expect(DAYS.map(estimateMinutes)).toEqual([35, 40, 35]);
   });
 });
+
+import { weekStart, weekStreak, weekDays } from '../src/logic/stats';
+import { describeItem } from '../src/logic/preview';
+import type { PlanItem } from '../src/types';
+
+describe('veckostatistik', () => {
+  const d = (y: number, m: number, day: number, h = 12) => new Date(y, m - 1, day, h).getTime();
+  it('veckan börjar på måndag', () => {
+    expect(weekStart(d(2026, 10, 15))).toBe(d(2026, 10, 12, 0));
+    expect(weekStart(d(2026, 10, 18, 23))).toBe(d(2026, 10, 12, 0));
+    expect(weekStart(d(2026, 10, 19, 0))).toBe(d(2026, 10, 19, 0));
+  });
+  it('serie: räknar veckor i rad, pågående vecka utan pass bryter inte', () => {
+    const times = [d(2026, 9, 29), d(2026, 10, 6), d(2026, 10, 8), d(2026, 10, 13)];
+    expect(weekStreak(times, d(2026, 10, 15))).toBe(3);
+    expect(weekStreak([d(2026, 10, 6)], d(2026, 10, 15))).toBe(1);
+    expect(weekStreak([d(2026, 9, 22)], d(2026, 10, 15))).toBe(0);
+    expect(weekStreak([], d(2026, 10, 15))).toBe(0);
+  });
+  it('veckodagar med pass och idag', () => {
+    const days = weekDays(
+      [
+        { startedAt: d(2026, 10, 12, 18), dayId: 'A' },
+        { startedAt: d(2026, 10, 14, 7), dayId: 'B' },
+      ],
+      d(2026, 10, 15),
+    );
+    expect(days).toHaveLength(7);
+    expect(days.map((x) => x.dayId)).toEqual(['A', undefined, 'B', undefined, undefined, undefined, undefined]);
+    expect(days.findIndex((x) => x.today)).toBe(3);
+  });
+});
+
+describe('förhandsvisning', () => {
+  const squat: PlanItem = { exerciseId: 'squat', sets: 4, repsMin: 5, repsMax: 5, restSec: 150, progression: { kind: 'weight', inc: 5 }, slot: 'squat', role: 'main' };
+  const log = (w: number | null) => ({ exerciseId: 'squat', sets: [{ weight: w, reps: 5, done: false }] });
+  it('visar uppgång mot förra passet', () => {
+    expect(describeItem(squat, log(85), { sets: [{ weight: 80, reps: 5, done: true }] })).toMatchObject({ weight: '80 → 85 kg', up: true });
+    expect(describeItem(squat, log(85), { sets: [{ weight: 85, reps: 5, done: true }] })).toMatchObject({ weight: '85 kg', up: false });
+    expect(describeItem(squat, log(null), undefined)).toMatchObject({ weight: 'ange vikt' });
+  });
+});

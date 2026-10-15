@@ -25,6 +25,30 @@ import { Summary } from './ui/Summary';
 import { Workout } from './ui/Workout';
 
 type Tab = 'home' | 'history' | 'settings';
+
+function TabIcon({ name }: { name: Tab }) {
+  const common = { width: 26, height: 26, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': true } as const;
+  if (name === 'home')
+    return (
+      <svg {...common}>
+        <path d="M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
+      </svg>
+    );
+  if (name === 'history')
+    return (
+      <svg {...common}>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </svg>
+    );
+  return (
+    <svg {...common}>
+      <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+      <circle cx="15" cy="7" r="2" />
+      <circle cx="9" cy="17" r="2" />
+    </svg>
+  );
+}
 type View = 'tabs' | 'workout' | 'summary';
 
 export function App() {
@@ -118,8 +142,8 @@ export function App() {
       <>
         <Workout
           session={working}
-          states={states}
           settings={cfg}
+          states={states}
           onChange={change}
           onFinish={onFinish}
           onDiscard={onDiscard}
@@ -143,7 +167,6 @@ export function App() {
           next={next}
           deloadSuggested={!!suggested}
           settings={cfg}
-          states={states}
           onStart={onStart}
           onResume={onResume}
           onSetDeload={(on) => void setDeload(on)}
@@ -152,7 +175,7 @@ export function App() {
       {tab === 'history' && <History sessions={done} />}
       {tab === 'settings' && <Settings settings={cfg} />}
       {error && <div class="toast" onClick={() => setError('')}>{error}</div>}
-      <nav class="tabbar">
+      <nav class="tabbar" aria-label="Huvudmeny">
         {(
           [
             ['home', 'Hem'],
@@ -160,8 +183,15 @@ export function App() {
             ['settings', 'Inställningar'],
           ] as const
         ).map(([id, label]) => (
-          <button key={id} class={tab === id ? 'on' : ''} onClick={() => setTab(id)} aria-current={tab === id ? 'page' : undefined}>
-            {label}
+          <button
+            key={id}
+            class={tab === id ? 'on' : ''}
+            onClick={() => setTab(id)}
+            aria-current={tab === id ? 'page' : undefined}
+            aria-label={label}
+            title={label}
+          >
+            <TabIcon name={id} />
           </button>
         ))}
       </nav>
