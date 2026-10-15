@@ -31,7 +31,7 @@ export function Home({ active, done, next, deloadSuggested, settings, onStart, o
   const rows = preview?.items.map((it, i) => describeItem(it, preview.strength[i], last?.[it.exerciseId]));
 
   return (
-    <div class="screen">
+    <div class="screen home">
       <header class="home-top">
         <div>
           <div class="date">{dateFmt.format(now)}</div>
@@ -101,8 +101,7 @@ export function Home({ active, done, next, deloadSuggested, settings, onStart, o
         </section>
       )}
 
-      <h2 class="h2">Veckan</h2>
-      <div class="week" aria-label="Veckans pass">
+            <div class="week" aria-label="Veckans pass">
         {days.map((d, i) => (
           <div class="wd" key={i}>
             {WEEKDAYS[i]}
@@ -112,17 +111,14 @@ export function Home({ active, done, next, deloadSuggested, settings, onStart, o
       </div>
 
       {!active && (
-        <>
-          <h2 class="h2">Annat pass</h2>
-          <div class="grid3">
-            {DAYS.map((d) => (
-              <button class="btn day" key={d.id} onClick={() => onStart(d.id)}>
-                <b>{d.id}</b>
-                <span class="small-text">{d.title}</span>
-              </button>
-            ))}
-          </div>
-        </>
+        <div class="other">
+          <span class="muted">Annat pass</span>
+          {DAYS.map((d) => (
+            <button class="btn day" key={d.id} onClick={() => onStart(d.id)} aria-label={`Starta pass ${d.id}: ${d.title}`} title={d.title}>
+              {d.id}
+            </button>
+          ))}
+        </div>
       )}
     </div>
   );

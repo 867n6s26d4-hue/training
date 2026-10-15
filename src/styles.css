@@ -1,4 +1,6 @@
 :root {
+  --sat: env(safe-area-inset-top);
+  --sab: env(safe-area-inset-bottom);
   /* Palett A: grafit och lime. Vila är terrakottarött. */
   --bg: #0e0f11;
   --surface: #17191c;
@@ -35,7 +37,7 @@ body {
   line-height: 1.35;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior-y: none;
-  padding: env(safe-area-inset-top) 0 0;
+  padding: var(--sat) 0 0;
 }
 button, input, select { font: inherit; color: inherit; }
 .tnum { font-variant-numeric: tabular-nums; }
@@ -44,7 +46,7 @@ button, input, select { font: inherit; color: inherit; }
 .ok-text { color: var(--ok); }
 .warn-text { color: var(--warn); }
 
-.screen { max-width: 560px; margin: 0 auto; padding: 8px 16px calc(96px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 12px; }
+.screen { max-width: 560px; margin: 0 auto; padding: 8px 16px calc(96px + var(--sab)); display: flex; flex-direction: column; gap: 12px; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; position: sticky; top: 0; background: var(--bg); z-index: 5; }
 .topbar.plain { justify-content: flex-start; position: static; }
 .topbar-title { font-weight: 700; display: flex; gap: 8px; align-items: center; }
@@ -116,18 +118,18 @@ p { margin: 0; }
 .hist-head { display: flex; justify-content: space-between; gap: 8px; }
 .hist-list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; font-size: 15px; }
 
-.tabbar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); z-index: 10; }
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: color-mix(in srgb, var(--bg) 94%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--line); padding-bottom: var(--sab); z-index: 10; }
 .tabbar button { flex: 1; appearance: none; background: none; border: 0; padding: 14px 2px 12px; color: var(--muted); min-height: 60px; display: grid; place-items: center; position: relative; }
 .tabbar button svg { display: block; }
 .tabbar button.on { color: var(--accent); }
 .tabbar button.on::before { content: ''; position: absolute; top: 0; left: 50%; width: 28px; height: 3px; margin-left: -14px; border-radius: 0 0 3px 3px; background: var(--accent); }
 
-.rest-bar { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); background: var(--rest-bg); border: 1px solid var(--rest-line); border-radius: 18px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,0.5); max-width: 536px; margin: 0 auto; }
+.rest-bar { position: fixed; left: 12px; right: 12px; bottom: calc(12px + var(--sab)); background: var(--rest-bg); border: 1px solid var(--rest-line); border-radius: 18px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; z-index: 20; box-shadow: 0 8px 30px rgba(0,0,0,0.5); max-width: 536px; margin: 0 auto; }
 .rest-bar.ready { background: color-mix(in srgb, var(--ok) 22%, var(--bg)); border-color: var(--ok); justify-content: center; }
 .rest-clock { font-size: 34px; font-weight: 800; min-width: 92px; }
 .rest-label { flex: 1; font-weight: 700; }
 
-.timer-screen { --tb: var(--tb-lead); --tf: var(--tf-lead); position: fixed; inset: 0; display: flex; flex-direction: column; padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 16px); background: var(--tb); color: var(--tf); z-index: 50; gap: 12px; }
+.timer-screen { --tb: var(--tb-lead); --tf: var(--tf-lead); position: fixed; inset: 0; display: flex; flex-direction: column; padding: calc(var(--sat) + 12px) 16px calc(var(--sab) + 16px); background: var(--tb); color: var(--tf); z-index: 50; gap: 12px; }
 .timer-screen[data-kind='minute'], .timer-screen[data-kind='work'] { --tb: var(--tb-work); --tf: var(--tf-work); }
 .timer-screen[data-kind='rest'] { --tb: var(--tb-rest); --tf: var(--tf-rest); }
 .timer-screen[data-kind='amrap'] { --tb: var(--tb-amrap); --tf: var(--tf-amrap); }
@@ -156,7 +158,7 @@ p { margin: 0; }
 .stepper.big .num { font-size: 64px; font-weight: 800; min-width: 90px; }
 .amrap-final { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 
-.toast { position: fixed; left: 16px; right: 16px; bottom: calc(80px + env(safe-area-inset-bottom)); background: var(--danger); color: var(--danger-ink); padding: 12px 14px; border-radius: 12px; font-weight: 700; z-index: 60; }
+.toast { position: fixed; left: 16px; right: 16px; bottom: calc(80px + var(--sab)); background: var(--danger); color: var(--danger-ink); padding: 12px 14px; border-radius: 12px; font-weight: 700; z-index: 60; }
 
 @media (prefers-reduced-motion: no-preference) { .btn, .step, .check { transition: transform 0.06s; } }
 
@@ -196,3 +198,16 @@ p { margin: 0; }
 .timer-screen[data-kind='fortime'] { --tb: var(--tb-amrap); --tf: var(--tf-amrap); }
 .timer-lines { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 20px; font-weight: 700; text-align: center; }
 .timer-screen .timer-top .chip { color: var(--tf); border-color: color-mix(in srgb, var(--tf) 35%, transparent); background: color-mix(in srgb, var(--tf) 10%, transparent); }
+
+/* Hemskärm: ska ge plats åt allt utan scroll på en iPhone i hemskärmsläge */
+.screen.home { gap: 12px; padding-bottom: calc(72px + var(--sab)); }
+.home .brand { font-size: 26px; }
+.home .hero2 { padding: 16px; gap: 9px; }
+.home .hero-name { font-size: 25px; }
+.home .hero-letter { width: 108px; height: 117px; top: 10px; right: 14px; }
+.home .lift { padding: 9px 0; font-size: 16px; }
+.home .hero2 .btn.xl { min-height: 56px; }
+.home .dot { width: 36px; height: 36px; }
+.other { display: flex; align-items: center; gap: 10px; }
+.other > span { flex: 1; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.other .btn.day { flex: 0 0 64px; flex-direction: row; min-height: 48px; padding: 0; font-size: 20px; font-weight: 800; }
