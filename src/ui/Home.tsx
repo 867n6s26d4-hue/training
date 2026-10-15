@@ -41,9 +41,19 @@ export function Home({ active, done, next, deloadSuggested, settings, onStart, o
       </header>
 
       <section class="hero2">
-        <div class="hero-letter" aria-hidden="true">
-          {day.id}
-        </div>
+        <svg class="hero-letter" viewBox="0 0 120 130" aria-hidden="true">
+          <defs>
+            <mask id="letter-ring" maskUnits="userSpaceOnUse" x="0" y="0" width="120" height="130">
+              <text x="60" y="108" text-anchor="middle" font-size="120" font-weight="900" fill="#fff" stroke="#fff" stroke-width="5" stroke-linejoin="round">
+                {day.id}
+              </text>
+              <text x="60" y="108" text-anchor="middle" font-size="120" font-weight="900" fill="#000">
+                {day.id}
+              </text>
+            </mask>
+          </defs>
+          <rect width="120" height="130" fill="currentColor" mask="url(#letter-ring)" />
+        </svg>
         <div class="kick">{active ? 'Pågående pass' : trainedToday ? 'Nästa pass' : 'Dagens pass'}</div>
         <h1 class="hero-name">{day.title}</h1>
         <div class="chips">

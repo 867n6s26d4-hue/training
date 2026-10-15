@@ -189,3 +189,5 @@ p { margin: 0; }
 .hero-letter { font-size: 190px; top: -26px; right: -4px; opacity: 0.8; }
 .lift .wt { color: var(--muted); font-weight: 600; }
 .hero-letter { font-size: 128px; top: 8px; right: 18px; line-height: 0.9; letter-spacing: 0; opacity: 1; color: color-mix(in srgb, var(--accent) 16%, transparent); -webkit-text-stroke: 0; font-weight: 900; }
+
+.hero-letter { position: absolute; top: 12px; right: 16px; width: 120px; height: 130px; font-size: inherit; color: color-mix(in srgb, var(--accent) 60%, transparent); -webkit-text-stroke: 0; pointer-events: none; }
