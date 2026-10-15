@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { ExerciseLog, ExerciseState, HiitLog, Session, SetLog, Settings, StrengthItem } from '../types';
-import { getDay, getExercise, hiitTitleFor, restText, targetText } from '../data/program';
+import { getDay, getExercise, hiitName, hiitResultText, hiitTitleFor, restText, targetText } from '../data/program';
 import { fmtKg } from '../logic/progression';
 import { platesPerSide } from '../logic/plates';
 import { buildRestPlan, fmtClock } from '../logic/timerPlan';
@@ -37,7 +37,7 @@ function lastText(last: { sets: SetLog[] } | undefined, kind: string): string | 
 export function Workout({ session, states, settings, onChange, onFinish, onDiscard, onBack }: Props) {
   const day = getDay(session.dayId);
   const hiit = session.hiitSpec;
-  const hiitTitle = hiitTitleFor(hiit);
+  const hiitTitle = hiitName(hiit);
   const [last, setLast] = useState<Last>({});
   const [hiitOpen, setHiitOpen] = useState(false);
   const [confirm, setConfirm] = useState<'finish' | 'discard' | null>(null);
@@ -236,6 +236,11 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
       <h2 class="h2">Del 2 · Högintensivt</h2>
       <section class="card hiit">
         <div class="ex-name">{hiitTitle}</div>
+        <div class="muted small-text">
+          {hiitTitleFor(hiit)}
+          {hiit.kind === 'fortime' && hiit.rounds && hiit.rounds > 1 ? ` · ${hiit.rounds} varv` : ''}
+        </div>
+        {hiit.note && <div class="muted small-text">{hiit.note}</div>}
         <ol class="hiit-list">
           {hiit.items.map((it, k) => (
             <li key={k}>{it}</li>
@@ -250,7 +255,7 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
         {session.hiit ? (
           <div class="result-line">
             <span class="tag ok">Klar</span>
-            {session.hiit.rounds !== undefined && <span> {session.hiit.rounds} varv</span>}
+            <span> {hiitResultText(session.hiit)}</span>
             {session.hiit.note && <span class="muted"> · {session.hiit.note}</span>}
             <button class="btn ghost small" onClick={openHiit}>
               Kör igen
@@ -258,7 +263,7 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
           </div>
         ) : (
           <button class="btn primary xl" onClick={openHiit}>
-            Starta {hiit.kind === 'emom' ? 'EMOM' : hiit.kind === 'amrap' ? 'AMRAP' : 'intervaller'}
+            Starta {{ emom: 'EMOM', e2mom: 'E2MOM', amrap: 'AMRAP', fortime: 'På tid', intervals: 'intervaller' }[hiit.kind]}
           </button>
         )}
         {!session.hiit && (

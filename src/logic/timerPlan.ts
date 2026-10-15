@@ -5,17 +5,19 @@ export interface TimerEvent {
   at: number;
   sound: SoundId;
 }
-export type SegmentKind = 'leadin' | 'work' | 'rest' | 'minute' | 'amrap';
+export type SegmentKind = 'leadin' | 'work' | 'rest' | 'minute' | 'amrap' | 'fortime';
 export interface Segment {
   start: number;
   end: number;
   kind: SegmentKind;
   title: string;
   detail?: string;
+  /** Rader att visa som lista (AMRAP, På tid) */
+  lines?: string[];
   next?: string;
 }
 export interface Plan {
-  kind: 'rest' | 'emom' | 'intervals' | 'amrap';
+  kind: 'rest' | 'emom' | 'e2mom' | 'intervals' | 'amrap' | 'fortime';
   totalMs: number;
   events: TimerEvent[];
   segments: Segment[];
@@ -142,7 +144,7 @@ export function buildAmrapPlan(minutes: number, items: string[], leadInSec = 5):
     end: total,
     kind: 'amrap',
     title: 'Så många varv som möjligt',
-    detail: items.join(' → '),
+    lines: items,
     next: 'Klart',
   });
   if (minutes >= 6) events.push({ at: L + dur / 2, sound: 'warn' });
@@ -150,6 +152,66 @@ export function buildAmrapPlan(minutes: number, items: string[], leadInSec = 5):
   events.push(...ticksBefore(total, L));
   events.push({ at: total, sound: 'final' });
   return { kind: 'amrap', totalMs: total, events: sortEvents(events), segments };
+}
+
+/** Varannan minut: ett block per två minuter, raderna roterar */
+export function buildE2momPlan(minutes: number, items: string[], leadInSec = 5): Plan {
+  const L = leadInSec * 1000;
+  const blocks = Math.max(1, Math.floor(minutes / 2));
+  const total = L + blocks * 120000;
+  const segments: Segment[] = [];
+  const events: TimerEvent[] = [];
+  if (L > 0) {
+    segments.push({ start: 0, end: L, kind: 'leadin', title: 'Gör dig redo', next: items[0] });
+    events.push(...ticksBefore(L, 0));
+  }
+  events.push({ at: L, sound: 'go' });
+  for (let i = 0; i < blocks; i++) {
+    const start = L + i * 120000;
+    segments.push({
+      start,
+      end: start + 120000,
+      kind: 'minute',
+      title: items[i % items.length],
+      detail: `Block ${i + 1} av ${blocks} · vila resten av de två minuterna`,
+      next: i + 1 < blocks ? items[(i + 1) % items.length] : 'Klart',
+    });
+    if (i >= 1) {
+      events.push(...ticksBefore(start, start - 120000));
+      events.push({ at: start, sound: 'go' });
+    }
+  }
+  events.push(...ticksBefore(total, total - 120000));
+  events.push({ at: total, sound: 'final' });
+  return { kind: 'e2mom', totalMs: total, events: sortEvents(events), segments };
+}
+
+/** På tid: klockan går upp till tidsgränsen. Passet avslutas av användaren när allt är gjort. */
+export function buildFortimePlan(capMinutes: number, items: string[], name = 'På tid', leadInSec = 5): Plan {
+  const L = leadInSec * 1000;
+  const dur = capMinutes * 60000;
+  const total = L + dur;
+  const segments: Segment[] = [];
+  const events: TimerEvent[] = [];
+  if (L > 0) {
+    segments.push({ start: 0, end: L, kind: 'leadin', title: 'Gör dig redo', next: name });
+    events.push(...ticksBefore(L, 0));
+  }
+  events.push({ at: L, sound: 'go' });
+  segments.push({
+    start: L,
+    end: total,
+    kind: 'fortime',
+    title: name,
+    detail: `Tidsgräns ${capMinutes} min`,
+    lines: items,
+    next: 'Klart',
+  });
+  if (capMinutes >= 6) events.push({ at: L + dur / 2, sound: 'warn' });
+  if (capMinutes >= 3) events.push({ at: total - 60000, sound: 'warn' });
+  events.push(...ticksBefore(total, L));
+  events.push({ at: total, sound: 'final' });
+  return { kind: 'fortime', totalMs: total, events: sortEvents(events), segments };
 }
 
 export function buildHiitPlan(spec: HiitSpec, leadInSec = 5): Plan {
@@ -160,6 +222,10 @@ export function buildHiitPlan(spec: HiitSpec, leadInSec = 5): Plan {
       return buildIntervalPlan(spec.workSec, spec.restSec, spec.rounds, spec.items, leadInSec);
     case 'amrap':
       return buildAmrapPlan(spec.minutes, spec.items, leadInSec);
+    case 'e2mom':
+      return buildE2momPlan(spec.minutes, spec.items, leadInSec);
+    case 'fortime':
+      return buildFortimePlan(spec.capMinutes, spec.items, spec.name, leadInSec);
   }
 }
 
@@ -194,4 +260,10 @@ export function fmtClock(ms: number): string {
   const m = Math.floor(s / 60);
   const r = s % 60;
   return `${m}:${String(r).padStart(2, '0')}`;
+}
+
+/** Uppräknande klocka (avrundas nedåt) */
+export function fmtElapsed(ms: number): string {
+  const s = Math.floor(Math.max(0, ms) / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }

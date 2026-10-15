@@ -1,5 +1,5 @@
 import type { Session } from '../types';
-import { getDay, getExercise, hiitTitleFor } from '../data/program';
+import { getDay, getExercise, hiitName, hiitResultText, hiitTitleFor } from '../data/program';
 import { fmtKg } from '../logic/progression';
 import { fmtDate, fmtDuration } from '../format';
 
@@ -44,8 +44,8 @@ export function History({ sessions }: { sessions: Session[] }) {
             })}
             {s.hiit?.completed && (
               <li class="tnum">
-                {s.hiitSpec ? hiitTitleFor(s.hiitSpec) : 'HIIT'}
-                {s.hiit.rounds !== undefined ? ` · ${s.hiit.rounds} varv` : ''}
+                {s.hiitSpec ? `${hiitName(s.hiitSpec)} · ${hiitTitleFor(s.hiitSpec)}` : 'HIIT'}
+                {hiitResultText(s.hiit) ? ` · ${hiitResultText(s.hiit)}` : ''}
                 {s.hiit.note ? ` · ${s.hiit.note}` : ''}
               </li>
             )}

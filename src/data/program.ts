@@ -1,3 +1,4 @@
+import { METCONS } from './metcons';
 import type { DayDef, DayId, ExerciseDef, HiitSpec, SlotDef, StrengthItem } from '../types';
 
 export const EXERCISES: Record<string, ExerciseDef> = {
@@ -129,11 +130,6 @@ export const DAYS: DayDef[] = [
     focus: 'Knäböj, bänkpress, rodd',
     warmup: 'Lätta set av knäböjen (t.ex. 2×5 med tom stång och 50 %), armcirklar, några bandrodd.',
     slots: slotsA,
-    hiitOptions: [
-      { kind: 'emom', minutes: 10, items: ['12 hantelsvingar (en hantel, båda händer)', '10 armhävningar på ringarna (eller i golvet)'] },
-      { kind: 'emom', minutes: 10, items: ['12 gobletböj (en hantel mot bröstet)', '12 bandrodd (bandet i dörren)'] },
-      { kind: 'emom', minutes: 10, items: ['10 hopp-utfall (eller utfall med hantlar)', '8 ringrodd (fötterna fram)'] },
-    ],
   },
   {
     id: 'B',
@@ -141,11 +137,6 @@ export const DAYS: DayDef[] = [
     focus: 'Marklyft, press, enbensböj',
     warmup: 'Lätta set marklyft (tom stång, sedan 50 %), höftmobilitet, 10 gobletböj med lätt hantel.',
     slots: slotsB,
-    hiitOptions: [
-      { kind: 'intervals', workSec: 40, restSec: 20, rounds: 5, items: ['Gobletböj (en hantel mot bröstet)', 'Gummibandsrodd (bandet fäst i dörren)', 'Burpees'] },
-      { kind: 'intervals', workSec: 40, restSec: 20, rounds: 5, items: ['Hantelmarklyft (två lätta hantlar)', 'Armhävningar', 'Mountain climbers'] },
-      { kind: 'intervals', workSec: 40, restSec: 20, rounds: 5, items: ['Step-up med hantlar', 'Bandpress från dörren', 'Hantelsvingar'] },
-    ],
   },
   {
     id: 'C',
@@ -153,11 +144,6 @@ export const DAYS: DayDef[] = [
     focus: 'Chins, rumänskt marklyft, triceps',
     warmup: 'Hänga i stången 2×20 s, 8 skulderblads-chins (scapula pull), lätta set rumänskt marklyft.',
     slots: slotsC,
-    hiitOptions: [
-      { kind: 'amrap', minutes: 10, items: ['8 hantelrodd per arm', '10 hopp-utfall (eller utfall med hantlar)', '12 bandpress från dörren', '30 s plankan'] },
-      { kind: 'amrap', minutes: 10, items: ['8 hantelrodd per arm', '12 gobletböj', '10 armhävningar', '30 s plankan'] },
-      { kind: 'amrap', minutes: 10, items: ['10 bandrodd', '10 hantelmarklyft (två lätta hantlar)', '8 dips på bänk', '20 mountain climbers'] },
-    ],
   },
 ];
 
@@ -186,19 +172,67 @@ export function pickOption(slot: SlotDef, block: number, rotation: number): { it
   return { item: slot.options[variant], variant };
 }
 
+const KIND_ORDER: HiitSpec['kind'][] = ['fortime', 'amrap', 'emom', 'e2mom', 'intervals'];
+
+/**
+ * HIIT-poolen för en passdag: hela banken minus pass som krockar med dagens baslyft.
+ * Ordningen varvar format (på tid, AMRAP, EMOM, E2MOM, intervaller) så att två pass i rad sällan har samma format.
+ */
+export function hiitPool(dayId: DayId): HiitSpec[] {
+  const groups = KIND_ORDER.map((k) => METCONS.filter((m) => m.spec.kind === k && !m.avoid?.includes(dayId)).map((m) => m.spec));
+  const out: HiitSpec[] = [];
+  for (let i = 0; groups.some((g) => i < g.length); i++) for (const g of groups) if (i < g.length) out.push(g[i]);
+  return out;
+}
+
+export function pickHiit(dayId: DayId, rotation: number): { spec: HiitSpec; variant: number } {
+  const pool = hiitPool(dayId);
+  const variant = rotation % pool.length;
+  return { spec: pool[variant], variant };
+}
+
+/** Formatet och längden, t.ex. "AMRAP 12 min" */
 export function hiitTitleFor(spec: HiitSpec): string {
   switch (spec.kind) {
     case 'emom':
       return `EMOM ${spec.minutes} min`;
+    case 'e2mom':
+      return `E2MOM ${spec.minutes} min`;
     case 'amrap':
       return `AMRAP ${spec.minutes} min`;
+    case 'fortime':
+      return `På tid · max ${spec.capMinutes} min`;
     case 'intervals':
       return `${spec.rounds} varv · ${spec.workSec}/${spec.restSec} s`;
   }
 }
 
+/** Passets namn om det har ett, annars formatet */
+export function hiitName(spec: HiitSpec): string {
+  return spec.name ?? hiitTitleFor(spec);
+}
+
+/** Resultatet i klartext för historik och passvy, t.ex. "8:42" eller "7 varv" */
+export function hiitResultText(log: { rounds?: number; timeSec?: number; capped?: boolean }): string {
+  const parts: string[] = [];
+  if (log.timeSec !== undefined) {
+    parts.push(`${Math.floor(log.timeSec / 60)}:${String(Math.round(log.timeSec % 60)).padStart(2, '0')}`);
+    if (log.capped) parts.push('(tidsgräns)');
+  }
+  if (log.rounds !== undefined) parts.push(`${log.rounds} varv`);
+  return parts.join(' ');
+}
+
+/** Uppskattad längd i minuter. På tid räknas som ca 80 % av tidsgränsen */
 export function hiitMinutes(h: HiitSpec): number {
-  return h.kind === 'intervals' ? (h.items.length * h.rounds * (h.workSec + h.restSec) - h.restSec) / 60 : h.minutes;
+  switch (h.kind) {
+    case 'intervals':
+      return (h.items.length * h.rounds * (h.workSec + h.restSec) - h.restSec) / 60;
+    case 'fortime':
+      return Math.round(h.capMinutes * 0.8);
+    default:
+      return h.minutes;
+  }
 }
 
 export function targetText(sets: number, repsMin: number, repsMax: number, label?: string): string {
@@ -213,6 +247,6 @@ export function restText(sec: number): string {
 }
 
 /** Uppskattad passlängd i minuter: uppvärmning + styrka (ca 22 min enligt programmet) + HIIT */
-export function estimateMinutes(day: DayDef): number {
-  return Math.round(3 + 22 + hiitMinutes(day.hiitOptions[0]));
+export function estimateMinutes(day: DayDef, hiit?: HiitSpec): number {
+  return Math.round(3 + 22 + hiitMinutes(hiit ?? hiitPool(day.id)[0]));
 }

@@ -23,10 +23,22 @@ export interface StrengthItem {
   targetLabel?: string;
 }
 
+interface HiitBase {
+  /** Passets namn, t.ex. "Cindy" */
+  name?: string;
+  note?: string;
+  /**
+   * emom/e2mom: en rad per minut/block, som roterar. amrap: övningarna i ett varv.
+   * fortime: rader som görs i ordning (en rad per varv i en stege, eller övningarna i ett varv om `rounds` anges).
+   */
+  items: string[];
+}
 export type HiitSpec =
-  | { kind: 'emom'; minutes: number; items: string[] }
-  | { kind: 'intervals'; workSec: number; restSec: number; rounds: number; items: string[] }
-  | { kind: 'amrap'; minutes: number; items: string[] };
+  | (HiitBase & { kind: 'emom'; minutes: number })
+  | (HiitBase & { kind: 'e2mom'; minutes: number })
+  | (HiitBase & { kind: 'intervals'; workSec: number; restSec: number; rounds: number })
+  | (HiitBase & { kind: 'amrap'; minutes: number })
+  | (HiitBase & { kind: 'fortime'; capMinutes: number; rounds?: number });
 
 /** En plats i passet. Baslyft byts per block, komplement roterar varje pass. */
 export interface SlotDef {
@@ -47,7 +59,6 @@ export interface DayDef {
   warmup: string;
   slots: SlotDef[];
   /** Alla alternativ har samma format och längd, bara olika övningar */
-  hiitOptions: HiitSpec[];
 }
 
 export interface SetLog {
@@ -67,6 +78,10 @@ export interface HiitLog {
   kind: HiitSpec['kind'];
   completed: boolean;
   rounds?: number;
+  /** På tid: sluttid i sekunder */
+  timeSec?: number;
+  /** På tid: tidsgränsen nåddes innan passet var klart */
+  capped?: boolean;
   note?: string;
 }
 

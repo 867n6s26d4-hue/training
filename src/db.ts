@@ -10,7 +10,7 @@ import {
   type SetLog,
   type Settings,
 } from './types';
-import { DAYS, getDay, getSlot, pickOption } from './data/program';
+import { DAYS, getDay, getSlot, hiitPool, pickHiit, pickOption } from './data/program';
 import { deloadSets, evaluateProgression, plannedReps } from './logic/progression';
 
 interface SettingRow {
@@ -104,7 +104,7 @@ export function buildSession(
     items.push({ ...item, slot: slot.slot, role: slot.role });
     variants[slot.slot] = variant;
   }
-  const hiitVariant = opts.rotation % day.hiitOptions.length;
+  const hiit = pickHiit(dayId, opts.rotation);
   return {
     dayId,
     startedAt: now,
@@ -113,8 +113,8 @@ export function buildSession(
     block: opts.block,
     items,
     variants,
-    hiitSpec: day.hiitOptions[hiitVariant],
-    hiitVariant,
+    hiitSpec: hiit.spec,
+    hiitVariant: hiit.variant,
     strength: items.map((it) => makeLog(it, states, lastSets, opts.deload)),
   };
 }
@@ -138,9 +138,9 @@ export function swapAccessory(session: Session, idx: number, states: States, las
 /** Byt HIIT-upplägg mot nästa alternativ. Kräver att HIIT inte redan är loggad. */
 export function swapHiit(session: Session): Session {
   if (session.hiit) return session;
-  const day = getDay(session.dayId);
-  const hiitVariant = (session.hiitVariant + 1) % day.hiitOptions.length;
-  return { ...session, hiitVariant, hiitSpec: day.hiitOptions[hiitVariant] };
+  const pool = hiitPool(session.dayId);
+  const hiitVariant = (session.hiitVariant + 1) % pool.length;
+  return { ...session, hiitVariant, hiitSpec: pool[hiitVariant] };
 }
 
 export async function lastDoneSets(): Promise<Record<string, { sets: SetLog[]; level?: string }>> {

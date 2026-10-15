@@ -76,7 +76,7 @@ describe('pass och progression', () => {
   it('komplementövningar och HIIT roterar medan baslyften ligger fast inom blocket', async () => {
     const ids = async (day: 'A' | 'B' | 'C') => {
       const s = await startSession(day, Date.now());
-      const r = { items: s.items.map((i) => i.exerciseId), hiit: s.hiitSpec.items[0] };
+      const r = { items: s.items.map((i) => i.exerciseId), hiit: s.hiitSpec.name, hiitKind: s.hiitSpec.kind };
       await completeAll(s.id!, {});
       await finishSession(s.id!);
       return r;
@@ -89,8 +89,9 @@ describe('pass och progression', () => {
     expect(a2.items).toEqual(['squat', 'bench', 'dbrow']);
     expect(a3.items).toEqual(['squat', 'bench', 'bandrow']);
     expect(a4.items).toEqual(a1.items);
-    expect(new Set([a1.hiit, a2.hiit, a3.hiit]).size).toBe(3);
-    expect(a4.hiit).toBe(a1.hiit);
+    expect(new Set([a1.hiit, a2.hiit, a3.hiit, a4.hiit]).size).toBe(4);
+    expect(a1.hiitKind).not.toBe(a2.hiitKind);
+    expect(a2.hiitKind).not.toBe(a3.hiitKind);
     // pass B påverkas inte av hur många A som gjorts
     expect((await ids('B')).items).toEqual(['deadlift', 'inclinepress', 'bulgarian']);
   });

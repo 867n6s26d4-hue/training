@@ -5,6 +5,9 @@ import {
   buildEmomPlan,
   buildIntervalPlan,
   buildAmrapPlan,
+  buildE2momPlan,
+  buildFortimePlan,
+  fmtElapsed,
   buildRestPlan,
   stateAt,
   fmtClock,
@@ -12,7 +15,8 @@ import {
 import { TimerEngine } from '../src/logic/timerEngine';
 import type { SoundId } from '../src/logic/timerPlan';
 import type { SetLog, StrengthItem } from '../src/types';
-import { DAYS, EXERCISES, hiitMinutes, restText, targetText } from '../src/data/program';
+import { DAYS, EXERCISES, hiitMinutes, hiitPool, hiitResultText, hiitTitleFor, restText, targetText } from '../src/data/program';
+import { METCONS } from '../src/data/metcons';
 
 const squat: StrengthItem = {
   exerciseId: 'squat', sets: 4, repsMin: 5, repsMax: 5, restSec: 150, progression: { kind: 'weight', inc: 5 },
@@ -135,18 +139,8 @@ describe('timerplaner', () => {
     expect(fmtClock(59001)).toBe('1:00');
     expect(fmtClock(0)).toBe('0:00');
   });
-  it('programmet: HIIT-alternativ har samma format och längd, och poolerna är konsekventa', () => {
+  it('programmet: baslyft och komplement är konsekventa', () => {
     for (const d of DAYS) {
-      const [first, ...rest] = d.hiitOptions;
-      const mins = hiitMinutes(first);
-      expect(mins).toBeGreaterThanOrEqual(10);
-      expect(mins).toBeLessThanOrEqual(15);
-      expect(rest.length).toBeGreaterThanOrEqual(1);
-      for (const h of rest) {
-        expect(h.kind).toBe(first.kind);
-        expect(hiitMinutes(h)).toBe(mins);
-        expect(h.items.length).toBe(first.items.length);
-      }
       for (const slot of d.slots) {
         expect(slot.options.length).toBeGreaterThanOrEqual(2);
         for (const o of slot.options) expect(EXERCISES[o.exerciseId]).toBeDefined();
@@ -220,9 +214,82 @@ describe('TimerEngine', () => {
 });
 
 import { estimateMinutes } from '../src/data/program';
+describe('metcon-banken', () => {
+  it('har unika id:n och minst 20 pass i alla fem format', () => {
+    const ids = METCONS.map((m) => m.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(METCONS.length).toBeGreaterThanOrEqual(20);
+    expect(new Set(METCONS.map((m) => m.spec.kind))).toEqual(new Set(['fortime', 'amrap', 'emom', 'e2mom', 'intervals']));
+  });
+  it('varje pass har längd 8–20 min, jämn E2MOM och rader', () => {
+    for (const m of METCONS) {
+      const mins = hiitMinutes(m.spec);
+      expect(mins, m.id).toBeGreaterThanOrEqual(8);
+      expect(mins, m.id).toBeLessThanOrEqual(20);
+      expect(m.spec.items.length, m.id).toBeGreaterThan(0);
+      expect(m.spec.name, m.id).toBeTruthy();
+      if (m.spec.kind === 'e2mom') expect(m.spec.minutes % (2 * m.spec.items.length), m.id).toBe(0);
+    }
+  });
+  it('passar utrustningen: inga lyft över huvudet, ingen löpning eller maskin', () => {
+    const forbidden = /thruster|över huvud|överhuvud|snatch|handstå|löp|hopprep|double under|box jump|wall ball|roddmaskin|\bpress över\b|pistol/i;
+    for (const m of METCONS) for (const it of m.spec.items) expect(it, m.id).not.toMatch(forbidden);
+  });
+  it('varje passdag får en pool med minst 8 pass och blandade format, och undviker krockar', () => {
+    for (const d of DAYS) {
+      const pool = hiitPool(d.id);
+      expect(pool.length, d.id).toBeGreaterThanOrEqual(8);
+      expect(new Set(pool.map((p) => p.kind)).size, d.id).toBe(5);
+      // de första fem passen har fem olika format
+      expect(new Set(pool.slice(0, 5).map((p) => p.kind)).size, d.id).toBe(5);
+      for (const m of METCONS) if (m.avoid?.includes(d.id)) expect(pool, m.id).not.toContain(m.spec);
+    }
+  });
+  it('titlar och resultattext', () => {
+    expect(hiitTitleFor({ kind: 'e2mom', minutes: 16, items: ['x'] })).toBe('E2MOM 16 min');
+    expect(hiitTitleFor({ kind: 'fortime', capMinutes: 10, items: ['x'] })).toBe('På tid · max 10 min');
+    expect(hiitResultText({ timeSec: 522 })).toBe('8:42');
+    expect(hiitResultText({ timeSec: 600, capped: true, rounds: 2 })).toBe('10:00 (tidsgräns) 2 varv');
+    expect(hiitResultText({ rounds: 7 })).toBe('7 varv');
+  });
+});
+
+describe('E2MOM och På tid', () => {
+  it('E2MOM 8 min: fyra block om två minuter, raderna växlar, signal vid varje blockstart', () => {
+    const p = buildE2momPlan(8, ['a', 'b'], 5);
+    expect(p.totalMs).toBe(5000 + 8 * 60000);
+    const blocks = p.segments.filter((x) => x.kind === 'minute');
+    expect(blocks.map((x) => x.title)).toEqual(['a', 'b', 'a', 'b']);
+    expect(blocks.every((x) => x.end - x.start === 120000)).toBe(true);
+    const go = p.events.filter((e) => e.sound === 'go').map((e) => e.at);
+    expect(go).toEqual([5000, 125000, 245000, 365000]);
+    expect(p.events.filter((e) => e.sound === 'final').map((e) => e.at)).toEqual([p.totalMs]);
+    expect(stateAt(p, 130000).segment.detail).toContain('Block 2 av 4');
+  });
+  it('På tid: ett segment med tidsgräns, varning halvvägs och en minut kvar', () => {
+    const p = buildFortimePlan(10, ['a', 'b'], 'Fran', 5);
+    expect(p.kind).toBe('fortime');
+    expect(p.totalMs).toBe(5000 + 600000);
+    const seg = p.segments.find((x) => x.kind === 'fortime')!;
+    expect(seg.lines).toEqual(['a', 'b']);
+    expect(seg.title).toBe('Fran');
+    expect(p.events.filter((e) => e.sound === 'warn').map((e) => e.at)).toEqual([305000, 545000]);
+    expect(p.events.at(-1)).toEqual({ at: p.totalMs, sound: 'final' });
+  });
+  it('fmtElapsed avrundar nedåt', () => {
+    expect(fmtElapsed(59999)).toBe('0:59');
+    expect(fmtElapsed(61000)).toBe('1:01');
+    expect(fmtElapsed(-5)).toBe('0:00');
+  });
+});
+
 describe('passlängd', () => {
-  it('uppskattar A=35, B=40, C=35 min', () => {
-    expect(DAYS.map(estimateMinutes)).toEqual([35, 40, 35]);
+  it('räknar 3 min uppvärmning + 22 min styrka + HIIT-passets längd', () => {
+    const [A] = DAYS;
+    expect(estimateMinutes(A, { kind: 'emom', minutes: 10, items: ['x'] })).toBe(35);
+    expect(estimateMinutes(A, { kind: 'intervals', workSec: 40, restSec: 20, rounds: 5, items: ['a', 'b', 'c'] })).toBe(40);
+    expect(estimateMinutes(A, { kind: 'fortime', capMinutes: 15, items: ['x'] })).toBe(37);
+    for (const d of DAYS) expect(estimateMinutes(d)).toBeGreaterThanOrEqual(30);
   });
 });
 

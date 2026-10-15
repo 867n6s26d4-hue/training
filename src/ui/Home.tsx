@@ -57,7 +57,7 @@ export function Home({ active, done, next, deloadSuggested, settings, onStart, o
         <div class="kick">{active ? 'Pågående pass' : trainedToday ? 'Nästa pass' : 'Dagens pass'}</div>
         <h1 class="hero-name">{day.title}</h1>
         <div class="chips">
-          <span class="chip">ca {estimateMinutes(day)} min</span>
+          <span class="chip">ca {estimateMinutes(day, preview?.hiitSpec)} min</span>
           <span class="chip">Block {(active ? active.block : settings.blockIndex) + 1}</span>
           {(active ? active.deload : settings.deloadRemaining > 0) && <span class="chip warn">Deload</span>}
         </div>
@@ -73,7 +73,7 @@ export function Home({ active, done, next, deloadSuggested, settings, onStart, o
               </div>
             ))}
             <div class="lift">
-              <b>HIIT</b>
+              <b>{preview.hiitSpec.name ?? 'HIIT'}</b>
               <span class="tnum">{hiitTitleFor(preview.hiitSpec)}</span>
             </div>
           </div>

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { HiitLog, HiitSpec } from '../types';
-import { buildHiitPlan, fmtClock, stateAt } from '../logic/timerPlan';
+import { buildHiitPlan, fmtClock, fmtElapsed, stateAt } from '../logic/timerPlan';
 import { engine } from '../timer';
 import { useInterval } from '../hooks';
 import { keepScreenOn } from '../wakelock';
+import { playSound } from '../audio';
 
 interface Props {
   title: string;
@@ -18,10 +19,19 @@ export function TimerScreen({ title, spec, leadInSec, onClose }: Props) {
   const [finished, setFinished] = useState(false);
   const [confirmStop, setConfirmStop] = useState(false);
   const [note, setNote] = useState('');
+  /** På tid: användarens sluttid i ms, eller tidsgränsen om den nåddes */
+  const [finalMs, setFinalMs] = useState<number | null>(null);
+  const [capped, setCapped] = useState(false);
   const [, force] = useState(0);
 
   useEffect(() => {
-    engine.onFinish = () => setFinished(true);
+    engine.onFinish = () => {
+      if (spec.kind === 'fortime') {
+        setFinalMs(spec.capMinutes * 60000);
+        setCapped(true);
+      }
+      setFinished(true);
+    };
     engine.start(plan);
     void keepScreenOn();
     force((n) => n + 1);
@@ -29,7 +39,7 @@ export function TimerScreen({ title, spec, leadInSec, onClose }: Props) {
       engine.onFinish = null;
       engine.stop();
     };
-  }, [plan]);
+  }, [plan, spec]);
 
   useInterval(!finished, 200);
 
@@ -37,9 +47,28 @@ export function TimerScreen({ title, spec, leadInSec, onClose }: Props) {
   const st = stateAt(plan, engine.elapsed());
   const seg = st.segment;
   const isAmrap = spec.kind === 'amrap';
+  const isFortime = spec.kind === 'fortime';
+  const countsRounds = isAmrap || (isFortime && (spec.rounds ?? 0) > 1);
+
+  /** På tid: klar före tidsgränsen */
+  const stopFortime = () => {
+    const ms = Math.max(0, engine.elapsed() - seg.start);
+    engine.stop();
+    playSound('final');
+    setFinalMs(Math.min(ms, spec.kind === 'fortime' ? spec.capMinutes * 60000 : ms));
+    setCapped(false);
+    setFinished(true);
+  };
 
   const finishDone = () =>
-    onClose({ kind: spec.kind, completed: true, rounds: isAmrap ? rounds : undefined, note: note.trim() || undefined });
+    onClose({
+      kind: spec.kind,
+      completed: true,
+      rounds: isAmrap || (isFortime && capped && countsRounds) ? rounds : undefined,
+      timeSec: isFortime && finalMs !== null ? Math.round(finalMs / 1000) : undefined,
+      capped: isFortime ? capped : undefined,
+      note: note.trim() || undefined,
+    });
 
   if (finished) {
     return (
@@ -49,7 +78,13 @@ export function TimerScreen({ title, spec, leadInSec, onClose }: Props) {
         </div>
         <div class="timer-mid">
           <div class="timer-title">Klart!</div>
-          {isAmrap && (
+          {isFortime && finalMs !== null && (
+            <div class="amrap-final">
+              <div class="muted">{capped ? 'Tidsgränsen nåddes' : 'Din tid'}</div>
+              <div class="timer-clock tnum">{fmtElapsed(finalMs)}</div>
+            </div>
+          )}
+          {(isAmrap || (isFortime && capped && countsRounds)) && (
             <div class="amrap-final">
               <div class="muted">Antal varv</div>
               <div class="stepper big">
@@ -87,20 +122,34 @@ export function TimerScreen({ title, spec, leadInSec, onClose }: Props) {
       </div>
       <div class="timer-mid">
         <div class="timer-phase">
-          {seg.kind === 'leadin' ? 'Förbered' : seg.kind === 'rest' ? 'Vila' : seg.kind === 'amrap' ? 'AMRAP' : 'Kör'}
+          {seg.kind === 'leadin' ? 'Förbered' : seg.kind === 'rest' ? 'Vila' : seg.kind === 'amrap' ? 'AMRAP' : seg.kind === 'fortime' ? 'På tid' : 'Kör'}
         </div>
-        <div class="timer-clock tnum">{fmtClock(st.segRemainingMs)}</div>
+        <div class="timer-clock tnum">
+          {seg.kind === 'fortime' ? fmtElapsed(engine.elapsed() - seg.start) : fmtClock(st.segRemainingMs)}
+        </div>
         <div class="timer-title">{seg.kind === 'rest' ? 'Vila' : seg.title}</div>
         {seg.detail && <div class="muted timer-detail">{seg.detail}</div>}
-        {seg.next && (
+        {seg.lines && (
+          <ul class="timer-lines">
+            {seg.lines.map((l, i) => (
+              <li key={i}>{l}</li>
+            ))}
+          </ul>
+        )}
+        {seg.next && !seg.lines && (
           <div class="timer-next">
             <span class="muted">Nästa</span> {seg.next}
           </div>
         )}
-        {isAmrap && seg.kind === 'amrap' && (
+        {countsRounds && (seg.kind === 'amrap' || seg.kind === 'fortime') && (
           <button class="btn round xl" onClick={() => setRounds((r) => r + 1)}>
-            <span class="round-count tnum">{rounds}</span>
+            <span class="round-count tnum">{isFortime ? `${rounds} / ${spec.rounds}` : rounds}</span>
             <span>+1 varv</span>
+          </button>
+        )}
+        {isFortime && seg.kind === 'fortime' && (
+          <button class="btn primary xl" onClick={stopFortime}>
+            Klar!
           </button>
         )}
       </div>
