@@ -188,3 +188,4 @@ p { margin: 0; }
 .dot.today { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent); }
 .hero-letter { font-size: 190px; top: -26px; right: -4px; opacity: 0.8; }
 .lift .wt { color: var(--muted); font-weight: 600; }
+.hero-letter { font-size: 128px; top: 8px; right: 18px; line-height: 0.9; letter-spacing: 0; opacity: 1; color: color-mix(in srgb, var(--accent) 16%, transparent); -webkit-text-stroke: 0; font-weight: 900; }
