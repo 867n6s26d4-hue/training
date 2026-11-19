@@ -338,7 +338,7 @@ describe('förhandsvisning', () => {
 import { nextSet, restAfterSet, supersetPairs } from '../src/logic/superset';
 import { ALL_DAYS, EXTRA_DAYS } from '../src/data/program';
 import { FLOWS } from '../src/data/extras';
-import { POSES } from '../src/data/poses';
+import { MOTION, POSES } from '../src/data/poses';
 import { buildFlowPlan, expandFlow, flowSeconds } from '../src/logic/timerPlan';
 
 describe('superset', () => {
@@ -438,6 +438,17 @@ describe('extrapass: rörlighet', () => {
     expect(flowSegs.some((x) => x.title.endsWith('höger') && x.mirror)).toBe(true);
     expect(flowSegs.some((x) => x.title.endsWith('vänster') && x.mirror)).toBe(false);
     expect(plan.segments[0].pose).toBe(flowSegs[0].pose);
+  });
+  it('rörelsens slutlägen matchar grundposernas delar och punktantal', () => {
+    for (const [k, m] of Object.entries(MOTION)) {
+      expect(POSES[k], k).toBeTruthy();
+      for (const [i, pts] of Object.entries(m.parts)) {
+        expect(POSES[k].parts[Number(i)]?.p.length, `${k} del ${i}`).toBe(pts.length);
+      }
+    }
+    // Alla flödessteg utom slutvilan ska ha en rörelse
+    const missing = Object.keys(POSES).filter((k) => k !== 'rest' && !MOTION[k]);
+    expect(missing).toEqual([]);
   });
   it('steg per sida delas i vänster och höger', () => {
     const flat = expandFlow([

@@ -35,4 +35,4 @@ testerna kontrollerar format, längd och att inga lyft över huvudet eller löpn
 - Extrapassen räknas inte i nästa-pass-förslaget, blockbyte, deload eller deloadförslaget, men syns i veckoraden och historiken.
 
 ### Bilder i rörlighetsflödena
-Varje flödessteg har en egen streckfigur (SVG-data i `src/data/poses.ts`, ritas av `src/ui/PoseFigure.tsx`) som visas stort på timerskärmen. Stegets namn kopplas till en pose via `POSE_BY_STEP`; höger sida speglas automatiskt. Nytt steg = ny pose i `POSES` (ett test kräver att alla steg har en bild).
+Varje flödessteg har en egen streckfigur (SVG-data i `src/data/poses.ts`, ritas av `src/ui/PoseFigure.tsx`) som visas stort på timerskärmen. Stegets namn kopplas till en pose via `POSE_BY_STEP`; höger sida speglas automatiskt. Figurerna rör sig sakta mellan grundläge och slutläge (`MOTION`, SMIL-animation; av om telefonen har minskad rörelse påslagen). Nytt steg = ny pose i `POSES` + ett slutläge i `MOTION` (ett test kräver att alla steg har en bild).
