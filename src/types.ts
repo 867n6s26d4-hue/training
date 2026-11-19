@@ -58,6 +58,8 @@ export interface DayDef {
   focus: string;
   warmup: string;
   slots: SlotDef[];
+  /** Två slots som körs som superset: ett set av vardera växelvis, vila efter paret */
+  superset?: [string, string];
   /** Alla alternativ har samma format och längd, bara olika övningar */
 }
 

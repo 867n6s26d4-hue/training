@@ -115,12 +115,12 @@ const slotsB: SlotDef[] = [
 ];
 const slotsC: SlotDef[] = [
   { slot: 'chins', role: 'main', options: [chinItem('chins'), chinItem('supchins'), chinItem('ringchins')] },
-  { slot: 'rdl', role: 'main', options: [item('rdl', 3, 8, 8, 120, w(5)), item('singlerdl', 3, 8, 8, 120, w(2.5))] },
   {
     slot: 'tri',
     role: 'accessory',
     options: [item('dips', 3, 8, 10, 90, reps), item('bandpushdown', 3, 12, 15, 90, reps), item('skull', 3, 10, 12, 90, w(2.5))],
   },
+  { slot: 'rdl', role: 'main', options: [item('rdl', 3, 8, 8, 120, w(5)), item('singlerdl', 3, 8, 8, 120, w(2.5))] },
 ];
 
 export const DAYS: DayDef[] = [
@@ -130,6 +130,7 @@ export const DAYS: DayDef[] = [
     focus: 'Knäböj, bänkpress, rodd',
     warmup: 'Lätta set av knäböjen (t.ex. 2×5 med tom stång och 50 %), armcirklar, några bandrodd.',
     slots: slotsA,
+    superset: ['bench', 'row'],
   },
   {
     id: 'B',
@@ -137,6 +138,7 @@ export const DAYS: DayDef[] = [
     focus: 'Marklyft, press, enbensböj',
     warmup: 'Lätta set marklyft (tom stång, sedan 50 %), höftmobilitet, 10 gobletböj med lätt hantel.',
     slots: slotsB,
+    superset: ['press', 'legs'],
   },
   {
     id: 'C',
@@ -144,6 +146,7 @@ export const DAYS: DayDef[] = [
     focus: 'Chins, rumänskt marklyft, triceps',
     warmup: 'Hänga i stången 2×20 s, 8 skulderblads-chins (scapula pull), lätta set rumänskt marklyft.',
     slots: slotsC,
+    superset: ['chins', 'tri'],
   },
 ];
 

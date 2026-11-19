@@ -211,3 +211,13 @@ p { margin: 0; }
 .other { display: flex; align-items: center; gap: 10px; }
 .other > span { flex: 1; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
 .other .btn.day { flex: 0 0 64px; flex-direction: row; min-height: 48px; padding: 0; font-size: 20px; font-weight: 800; }
+
+/* Superset */
+.card.superset { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+.ss-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ss-badge { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px; border-radius: 7px; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 800; vertical-align: 2px; }
+.ss-sep { height: 1px; background: var(--line); margin: 4px 0; }
+.ss-round { display: flex; flex-direction: column; gap: 6px; }
+.ss-round + .ss-round { margin-top: 6px; }
+.ss-round-label { text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
+.set-row.next:not(.done) { border-color: var(--accent); }

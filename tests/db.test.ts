@@ -122,7 +122,7 @@ describe('pass och progression', () => {
     await completeAll(a.id!, {});
     await finishSession(a.id!);
     const c = await startSession('C', 8000);
-    expect(c.items.map((i) => i.exerciseId).slice(0, 2)).toEqual(['supchins', 'singlerdl']);
+    expect(c.items.map((i) => i.exerciseId)).toEqual(['supchins', expect.any(String), 'singlerdl']);
   });
 
   it('avbruten deload (ångra) byter inte block', async () => {

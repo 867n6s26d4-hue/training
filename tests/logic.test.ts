@@ -334,3 +334,45 @@ describe('förhandsvisning', () => {
     expect(describeItem(squat, log(null), undefined)).toMatchObject({ weight: 'ange vikt' });
   });
 });
+
+import { nextInSuperset, restAfterSet, supersetPair } from '../src/logic/superset';
+
+describe('superset', () => {
+  it('varje passdag har ett superset av två intilliggande slots med en kombination som passar', () => {
+    for (const d of DAYS) {
+      expect(d.superset, d.id).toBeDefined();
+      const idx = d.superset!.map((s) => d.slots.findIndex((x) => x.slot === s));
+      expect(idx.every((i) => i >= 0), d.id).toBe(true);
+      expect(Math.abs(idx[0] - idx[1]), d.id).toBe(1);
+    }
+    expect(DAYS.map((d) => d.superset)).toEqual([
+      ['bench', 'row'],
+      ['press', 'legs'],
+      ['chins', 'tri'],
+    ]);
+  });
+  const items = [{ slot: 'squat', restSec: 150 }, { slot: 'bench', restSec: 150 }, { slot: 'row', restSec: 90 }];
+  it('hittar paret oavsett ordning', () => {
+    expect(supersetPair(items, ['bench', 'row'])).toEqual([1, 2]);
+    expect(supersetPair(items, ['row', 'bench'])).toEqual([1, 2]);
+    expect(supersetPair(items, ['bench', 'okänd'])).toBeNull();
+    expect(supersetPair(items, undefined)).toBeNull();
+  });
+  it('vila: ingen efter första övningen, längsta efter andra, vanlig vila utanför paret', () => {
+    const counts = [4, 4, 3];
+    const pair: [number, number] = [1, 2];
+    expect(restAfterSet(items, counts, pair, 0, 0)).toBe(150);
+    expect(restAfterSet(items, counts, pair, 1, 0)).toBe(0);
+    expect(restAfterSet(items, counts, pair, 2, 0)).toBe(150);
+    // varv 4: rodd saknar set, bänkpress vilar som vanligt
+    expect(restAfterSet(items, counts, pair, 1, 3)).toBe(150);
+    expect(restAfterSet(items, counts, null, 2, 1)).toBe(90);
+  });
+  it('nästa set går varv för varv', () => {
+    const mk = (done: boolean[]) => ({ exerciseId: 'x', sets: done.map((d) => ({ weight: 1, reps: 1, done: d })) });
+    expect(nextInSuperset([mk([]), mk([false, false]), mk([false, false])], [1, 2])).toEqual({ i: 1, j: 0 });
+    expect(nextInSuperset([mk([]), mk([true, false]), mk([false, false])], [1, 2])).toEqual({ i: 2, j: 0 });
+    expect(nextInSuperset([mk([]), mk([true, false]), mk([true, false])], [1, 2])).toEqual({ i: 1, j: 1 });
+    expect(nextInSuperset([mk([]), mk([true]), mk([true])], [1, 2])).toBeNull();
+  });
+});

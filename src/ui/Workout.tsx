@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import type { ExerciseLog, ExerciseState, HiitLog, Session, SetLog, Settings, StrengthItem } from '../types';
+import type { ExerciseLog, ExerciseState, HiitLog, Session, SetLog, Settings } from '../types';
 import { getDay, getExercise, hiitName, hiitResultText, hiitTitleFor, restText, targetText } from '../data/program';
 import { fmtKg } from '../logic/progression';
+import { nextInSuperset, restAfterSet, supersetPair } from '../logic/superset';
 import { platesPerSide } from '../logic/plates';
 import { buildRestPlan, fmtClock } from '../logic/timerPlan';
 import { engine } from '../timer';
@@ -92,15 +93,17 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
       };
     });
 
-  const toggleDone = (i: number, j: number, item: StrengthItem) => {
+  const pair = supersetPair(session.items, day.superset);
+
+  const toggleDone = (i: number, j: number) => {
     const ex = session.strength[i];
     const nowDone = !ex.sets[j].done;
     setSet(i, j, { done: nowDone });
-    if (nowDone) {
-      const lastSetOfAll = i === session.strength.length - 1 && j === ex.sets.length - 1;
-      if (!lastSetOfAll) startRest(item.restSec);
-      else void unlockAudio(settings.audioSession);
-    }
+    if (!nowDone) return;
+    const allDone = session.strength.every((e, a) => e.sets.every((x, b) => (a === i && b === j) || x.done));
+    const rest = restAfterSet(session.items, session.strength.map((e) => e.sets.length), pair, i, j);
+    if (allDone) void unlockAudio(settings.audioSession);
+    else if (rest > 0) startRest(rest);
   };
 
   const totalSets = useMemo(() => session.strength.reduce((n, e) => n + e.sets.length, 0), [session]);
@@ -150,88 +153,130 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
       )}
 
       <h2 class="h2">Del 1 · Styrka</h2>
-      {session.items.map((item, i) => {
-        const def = getExercise(item.exerciseId);
-        const ex = session.strength[i];
-        const st = states[item.exerciseId];
-        const topWeight = ex.sets.find((x) => !x.done)?.weight ?? ex.sets[0]?.weight ?? null;
-        const plates =
-          def.kind === 'barbell' && topWeight !== null && topWeight > settings.barWeight
-            ? platesPerSide(topWeight, settings.barWeight, settings.plates)
-            : null;
-        const lt = lastText(last[item.exerciseId], def.kind);
-        return (
-          <section class="card ex" key={item.exerciseId}>
-            <div class="ex-head">
-              <div>
-                <div class="ex-name">{def.name}</div>
-                {def.note && <div class="muted small-text">{def.note}</div>}
-              </div>
-              <div class="ex-target">
-                <div class="tnum">{targetText(ex.sets.length, item.repsMin, item.repsMax, session.deload ? undefined : item.targetLabel)}</div>
-                <div class="muted small-text">vila {restText(item.restSec)}</div>
-              </div>
-            </div>
-            {item.role === 'accessory' && !ex.sets.some((x) => x.done) && (
-              <button
-                class="btn ghost small swap"
-                onClick={() => onChange((s) => swapAccessory(s, i, states, last))}
-              >
-                Byt övning
-              </button>
-            )}
-            {lt && <div class="muted small-text">Förra gången: {lt}</div>}
-            {st?.suggestHarder && (
-              <div class="hint">Alla set på toppen förra gången. Dags för en svårare variant.</div>
-            )}
-            {plates && (
-              <div class="plates tnum">
-                Skivor per sida: {plates.perSide.length ? plates.perSide.map(fmtKg).join(' + ') : 'bara stången'}
-                {plates.remainder > 0 && <span class="warn-text"> (saknar {fmtKg(plates.remainder)} kg)</span>}
-              </div>
-            )}
-            {(def.kind === 'bodyweight' || def.kind === 'weighted-bodyweight') && (
-              <input
-                class="text-input"
-                placeholder={def.kind === 'bodyweight' ? 'Nivå (ringhöjd, bandfärg, variant)' : 'Variant (t.ex. band)'}
-                value={ex.level ?? ''}
-                onInput={(e) => updateEx(i, (x) => ({ ...x, level: (e.currentTarget as HTMLInputElement).value }))}
-              />
-            )}
-            <div class="sets">
-              {ex.sets.map((set, j) => (
-                <div class={'set-row' + (set.done ? ' done' : '')} key={j}>
-                  <div class="set-no tnum">{j + 1}</div>
-                  {def.kind !== 'bodyweight' && (
-                    <Stepper
-                      label={def.kind === 'weighted-bodyweight' ? 'kg extra' : def.kind === 'dumbbell' ? 'kg/hantel' : 'kg'}
-                      value={set.weight}
-                      step={2.5}
-                      allowNegative={def.kind === 'weighted-bodyweight'}
-                      decimals
-                      onChange={(v) => setWeight(i, j, v)}
-                    />
-                  )}
-                  <Stepper
-                    label={def.repsSuffix ? `reps${def.repsSuffix}` : 'reps'}
-                    value={set.reps}
-                    step={1}
-                    onChange={(v) => setSet(i, j, { reps: v })}
-                  />
-                  <button
-                    class={'check' + (set.done ? ' on' : '')}
-                    aria-label={set.done ? 'Ångra klart' : 'Markera klart'}
-                    aria-pressed={set.done}
-                    onClick={() => toggleDone(i, j, item)}
-                  >
-                    ✓
-                  </button>
+      {(() => {
+        const next = nextInSuperset(session.strength, pair);
+        const exHead = (i: number, badge?: string) => {
+          const item = session.items[i];
+          const def = getExercise(item.exerciseId);
+          const ex = session.strength[i];
+          const st = states[item.exerciseId];
+          const topWeight = ex.sets.find((x) => !x.done)?.weight ?? ex.sets[0]?.weight ?? null;
+          const plates =
+            def.kind === 'barbell' && topWeight !== null && topWeight > settings.barWeight
+              ? platesPerSide(topWeight, settings.barWeight, settings.plates)
+              : null;
+          const lt = lastText(last[item.exerciseId], def.kind);
+          return (
+            <>
+              <div class="ex-head">
+                <div>
+                  <div class="ex-name">
+                    {badge && <span class="ss-badge">{badge}</span>}
+                    {def.name}
+                  </div>
+                  {def.note && <div class="muted small-text">{def.note}</div>}
                 </div>
-              ))}
+                <div class="ex-target">
+                  <div class="tnum">{targetText(ex.sets.length, item.repsMin, item.repsMax, session.deload ? undefined : item.targetLabel)}</div>
+                  {!badge && <div class="muted small-text">vila {restText(item.restSec)}</div>}
+                </div>
+              </div>
+              {item.role === 'accessory' && !ex.sets.some((x) => x.done) && (
+                <button class="btn ghost small swap" onClick={() => onChange((s) => swapAccessory(s, i, states, last))}>
+                  Byt övning
+                </button>
+              )}
+              {lt && <div class="muted small-text">Förra gången: {lt}</div>}
+              {st?.suggestHarder && <div class="hint">Alla set på toppen förra gången. Dags för en svårare variant.</div>}
+              {plates && (
+                <div class="plates tnum">
+                  Skivor per sida: {plates.perSide.length ? plates.perSide.map(fmtKg).join(' + ') : 'bara stången'}
+                  {plates.remainder > 0 && <span class="warn-text"> (saknar {fmtKg(plates.remainder)} kg)</span>}
+                </div>
+              )}
+              {(def.kind === 'bodyweight' || def.kind === 'weighted-bodyweight') && (
+                <input
+                  class="text-input"
+                  placeholder={def.kind === 'bodyweight' ? 'Nivå (ringhöjd, bandfärg, variant)' : 'Variant (t.ex. band)'}
+                  value={ex.level ?? ''}
+                  onInput={(e) => updateEx(i, (x) => ({ ...x, level: (e.currentTarget as HTMLInputElement).value }))}
+                />
+              )}
+            </>
+          );
+        };
+        const setRow = (i: number, j: number, label?: string) => {
+          const def = getExercise(session.items[i].exerciseId);
+          const set = session.strength[i].sets[j];
+          const isNext = next?.i === i && next.j === j;
+          return (
+            <div class={'set-row' + (set.done ? ' done' : '') + (isNext ? ' next' : '')} key={`${i}-${j}`}>
+              <div class="set-no tnum">{label ?? j + 1}</div>
+              {def.kind !== 'bodyweight' && (
+                <Stepper
+                  label={def.kind === 'weighted-bodyweight' ? 'kg extra' : def.kind === 'dumbbell' ? 'kg/hantel' : 'kg'}
+                  value={set.weight}
+                  step={2.5}
+                  allowNegative={def.kind === 'weighted-bodyweight'}
+                  decimals
+                  onChange={(v) => setWeight(i, j, v)}
+                />
+              )}
+              <Stepper
+                label={def.repsSuffix ? `reps${def.repsSuffix}` : 'reps'}
+                value={set.reps}
+                step={1}
+                onChange={(v) => setSet(i, j, { reps: v })}
+              />
+              <button
+                class={'check' + (set.done ? ' on' : '')}
+                aria-label={set.done ? 'Ångra klart' : 'Markera klart'}
+                aria-pressed={set.done}
+                onClick={() => toggleDone(i, j)}
+              >
+                ✓
+              </button>
             </div>
-          </section>
-        );
-      })}
+          );
+        };
+
+        const blocks: preact.JSX.Element[] = [];
+        for (let i = 0; i < session.items.length; i++) {
+          if (pair && i === pair[0]) {
+            const [a, b] = pair;
+            const rounds = Math.max(session.strength[a].sets.length, session.strength[b].sets.length);
+            const restSec = Math.max(session.items[a].restSec, session.items[b].restSec);
+            blocks.push(
+              <section class="card ex superset" key="superset">
+                <div class="ss-title">
+                  <span class="tag ok">Superset</span>
+                  <span class="muted small-text">växla mellan övningarna · vila {restText(restSec)} efter paret</span>
+                </div>
+                {exHead(a, 'A')}
+                <div class="ss-sep" />
+                {exHead(b, 'B')}
+                <div class="sets">
+                  {Array.from({ length: rounds }, (_, j) => (
+                    <div class="ss-round" key={j}>
+                      <div class="muted small-text ss-round-label">Varv {j + 1}</div>
+                      {[a, b].map((x, k) => (j < session.strength[x].sets.length ? setRow(x, j, k === 0 ? 'A' : 'B') : null))}
+                    </div>
+                  ))}
+                </div>
+              </section>,
+            );
+            i = pair[1];
+            continue;
+          }
+          blocks.push(
+            <section class="card ex" key={session.items[i].exerciseId}>
+              {exHead(i)}
+              <div class="sets">{session.strength[i].sets.map((_, j) => setRow(i, j))}</div>
+            </section>,
+          );
+        }
+        return blocks;
+      })()}
 
       <h2 class="h2">Del 2 · Högintensivt</h2>
       <section class="card hiit">
