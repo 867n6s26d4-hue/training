@@ -113,7 +113,7 @@ export function buildSession(
     block: opts.block,
     items,
     variants,
-    hiitSpec: hiit.spec,
+    ...(hiit.spec ? { hiitSpec: hiit.spec } : {}),
     hiitVariant: hiit.variant,
     strength: items.map((it) => makeLog(it, states, lastSets, opts.deload)),
   };
@@ -139,6 +139,7 @@ export function swapAccessory(session: Session, idx: number, states: States, las
 export function swapHiit(session: Session): Session {
   if (session.hiit) return session;
   const pool = hiitPool(session.dayId);
+  if (!pool.length) return session;
   const hiitVariant = (session.hiitVariant + 1) % pool.length;
   return { ...session, hiitVariant, hiitSpec: pool[hiitVariant] };
 }
@@ -170,7 +171,7 @@ export async function previewNext(dayId: DayId, now = Date.now()): Promise<Sessi
     dayId,
     await loadStates(),
     await lastDoneSets(),
-    { deload: settings.deloadRemaining > 0, block: settings.blockIndex, rotation },
+    { deload: !getDay(dayId).extra && settings.deloadRemaining > 0, block: settings.blockIndex, rotation },
     now,
   );
 }
@@ -180,7 +181,8 @@ export async function startSession(dayId: DayId, now = Date.now()): Promise<Sess
   if (existing) return existing;
   const settings = await getSettings();
   const rotation = (await db.sessions.where('status').equals('done').toArray()).filter((s) => s.dayId === dayId).length;
-  const deload = settings.deloadRemaining > 0;
+  // Deload gäller bara A/B/C, inte extrapassen
+  const deload = !getDay(dayId).extra && settings.deloadRemaining > 0;
   const session = buildSession(
     dayId,
     await loadStates(),
@@ -268,7 +270,10 @@ export async function listDoneSessions(): Promise<Session[]> {
 export async function suggestNextDay(): Promise<DayId> {
   const done = await listDoneSessions();
   if (!done.length) return 'A';
-  const idx = DAYS.findIndex((d) => d.id === done[0].dayId);
+  // Extrapass (rörlighet, axlar + core) ingår inte i cykeln
+  const last = done.find((s) => DAYS.some((d) => d.id === s.dayId));
+  if (!last) return 'A';
+  const idx = DAYS.findIndex((d) => d.id === last.dayId);
   return DAYS[(idx + 1) % DAYS.length].id;
 }
 
@@ -278,7 +283,7 @@ const WEEK_MS = 7 * 24 * 3600 * 1000;
 export async function deloadSuggested(now = Date.now()): Promise<boolean> {
   const settings = await getSettings();
   if (settings.deloadRemaining > 0) return false;
-  const done = await listDoneSessions();
+  const done = (await listDoneSessions()).filter((s) => DAYS.some((d) => d.id === s.dayId));
   if (done.length < 6) return false;
   const first = done[done.length - 1].startedAt;
   const since = settings.lastDeloadAt ?? first;

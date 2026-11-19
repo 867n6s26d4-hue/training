@@ -335,44 +335,122 @@ describe('förhandsvisning', () => {
   });
 });
 
-import { nextInSuperset, restAfterSet, supersetPair } from '../src/logic/superset';
+import { nextSet, restAfterSet, supersetPairs } from '../src/logic/superset';
+import { ALL_DAYS, EXTRA_DAYS } from '../src/data/program';
+import { FLOWS } from '../src/data/extras';
+import { buildFlowPlan, expandFlow, flowSeconds } from '../src/logic/timerPlan';
 
 describe('superset', () => {
-  it('varje passdag har ett superset av två intilliggande slots med en kombination som passar', () => {
-    for (const d of DAYS) {
-      expect(d.superset, d.id).toBeDefined();
-      const idx = d.superset!.map((s) => d.slots.findIndex((x) => x.slot === s));
-      expect(idx.every((i) => i >= 0), d.id).toBe(true);
-      expect(Math.abs(idx[0] - idx[1]), d.id).toBe(1);
+  it('varje passdag med superset har par av intilliggande slots', () => {
+    for (const d of ALL_DAYS) {
+      for (const [x, y] of d.superset ?? []) {
+        const a = d.slots.findIndex((s) => s.slot === x);
+        const b = d.slots.findIndex((s) => s.slot === y);
+        expect(a, d.id).toBeGreaterThanOrEqual(0);
+        expect(b, d.id).toBeGreaterThanOrEqual(0);
+        expect(Math.abs(a - b), d.id).toBe(1);
+      }
     }
-    expect(DAYS.map((d) => d.superset)).toEqual([
-      ['bench', 'row'],
-      ['press', 'legs'],
-      ['chins', 'tri'],
+    expect(DAYS.map((d) => d.superset)).toEqual([[['bench', 'row']], [['press', 'legs']], [['chins', 'tri']]]);
+    expect(EXTRA_DAYS.find((d) => d.id === 'S')!.superset).toEqual([
+      ['cuff', 'plank'],
+      ['rear', 'antirot'],
+      ['scap', 'hang'],
     ]);
   });
   const items = [{ slot: 'squat', restSec: 150 }, { slot: 'bench', restSec: 150 }, { slot: 'row', restSec: 90 }];
-  it('hittar paret oavsett ordning', () => {
-    expect(supersetPair(items, ['bench', 'row'])).toEqual([1, 2]);
-    expect(supersetPair(items, ['row', 'bench'])).toEqual([1, 2]);
-    expect(supersetPair(items, ['bench', 'okänd'])).toBeNull();
-    expect(supersetPair(items, undefined)).toBeNull();
+  it('hittar paren oavsett ordning', () => {
+    expect(supersetPairs(items, [['bench', 'row']])).toEqual([[1, 2]]);
+    expect(supersetPairs(items, [['row', 'bench']])).toEqual([[1, 2]]);
+    expect(supersetPairs(items, [['bench', 'okänd']])).toEqual([]);
+    expect(supersetPairs(items, undefined)).toEqual([]);
   });
-  it('vila: ingen efter första övningen, längsta efter andra, vanlig vila utanför paret', () => {
+  it('vila: ingen efter första övningen, längsta efter andra, vanlig vila utanför paren', () => {
     const counts = [4, 4, 3];
-    const pair: [number, number] = [1, 2];
-    expect(restAfterSet(items, counts, pair, 0, 0)).toBe(150);
-    expect(restAfterSet(items, counts, pair, 1, 0)).toBe(0);
-    expect(restAfterSet(items, counts, pair, 2, 0)).toBe(150);
+    const pairs: [number, number][] = [[1, 2]];
+    expect(restAfterSet(items, counts, pairs, 0, 0)).toBe(150);
+    expect(restAfterSet(items, counts, pairs, 1, 0)).toBe(0);
+    expect(restAfterSet(items, counts, pairs, 2, 0)).toBe(150);
     // varv 4: rodd saknar set, bänkpress vilar som vanligt
-    expect(restAfterSet(items, counts, pair, 1, 3)).toBe(150);
-    expect(restAfterSet(items, counts, null, 2, 1)).toBe(90);
+    expect(restAfterSet(items, counts, pairs, 1, 3)).toBe(150);
+    expect(restAfterSet(items, counts, [], 2, 1)).toBe(90);
   });
-  it('nästa set går varv för varv', () => {
+  it('nästa set går övning för övning och varv för varv i superset, över flera par', () => {
     const mk = (done: boolean[]) => ({ exerciseId: 'x', sets: done.map((d) => ({ weight: 1, reps: 1, done: d })) });
-    expect(nextInSuperset([mk([]), mk([false, false]), mk([false, false])], [1, 2])).toEqual({ i: 1, j: 0 });
-    expect(nextInSuperset([mk([]), mk([true, false]), mk([false, false])], [1, 2])).toEqual({ i: 2, j: 0 });
-    expect(nextInSuperset([mk([]), mk([true, false]), mk([true, false])], [1, 2])).toEqual({ i: 1, j: 1 });
-    expect(nextInSuperset([mk([]), mk([true]), mk([true])], [1, 2])).toBeNull();
+    const pairs: [number, number][] = [[1, 2]];
+    expect(nextSet([mk([false]), mk([false, false]), mk([false, false])], pairs)).toEqual({ i: 0, j: 0 });
+    expect(nextSet([mk([true]), mk([false, false]), mk([false, false])], pairs)).toEqual({ i: 1, j: 0 });
+    expect(nextSet([mk([true]), mk([true, false]), mk([false, false])], pairs)).toEqual({ i: 2, j: 0 });
+    expect(nextSet([mk([true]), mk([true, false]), mk([true, false])], pairs)).toEqual({ i: 1, j: 1 });
+    expect(nextSet([mk([true]), mk([true]), mk([true])], pairs)).toBeNull();
+    const two: [number, number][] = [[0, 1], [2, 3]];
+    expect(nextSet([mk([true]), mk([true]), mk([false]), mk([false])], two)).toEqual({ i: 2, j: 0 });
+  });
+});
+
+describe('extrapass: axlar + core', () => {
+  const S = EXTRA_DAYS.find((d) => d.id === 'S')!;
+  it('har sex slots i tre par, ingen HIIT, och övningar som finns', () => {
+    expect(S.slots).toHaveLength(6);
+    expect(S.finisher).toBe('none');
+    expect(S.extra).toBe(true);
+    for (const slot of S.slots) for (const o of slot.options) expect(EXERCISES[o.exerciseId], o.exerciseId).toBeDefined();
+    expect(hiitPool('S')).toEqual([]);
+  });
+  it('tidshåll anges i sekunder och inga övningar kräver lyft över huvudet', () => {
+    expect(targetText(3, 30, 60, undefined, 'sek')).toBe('3 × 30–60 s');
+    expect(EXERCISES.plank.unit).toBe('sek');
+    const text = S.slots.flatMap((sl) => sl.options.map((o) => EXERCISES[o.exerciseId].name + ' ' + (EXERCISES[o.exerciseId].note ?? ''))).join(' ');
+    expect(text).not.toMatch(/över huvud|överhuvud|thruster|snatch/i);
+  });
+  it('passlängden ligger på 20–35 min', () => {
+    expect(estimateMinutes(S)).toBeGreaterThanOrEqual(20);
+    expect(estimateMinutes(S)).toBeLessThanOrEqual(35);
+  });
+});
+
+describe('extrapass: rörlighet', () => {
+  it('flödena är 12–20 min och har instruktioner på varje steg', () => {
+    expect(FLOWS.length).toBeGreaterThanOrEqual(3);
+    for (const f of FLOWS) {
+      expect(f.kind).toBe('flow');
+      if (f.kind !== 'flow') continue;
+      const min = flowSeconds(f.steps) / 60;
+      expect(min, f.name).toBeGreaterThanOrEqual(12);
+      expect(min, f.name).toBeLessThanOrEqual(20);
+      for (const st of f.steps) {
+        expect(st.cue.length, st.name).toBeGreaterThan(10);
+        expect(st.sec, st.name).toBeGreaterThanOrEqual(30);
+      }
+      expect(f.items).toHaveLength(f.steps.length);
+    }
+    expect(hiitPool('M')).toBe(FLOWS);
+    expect(estimateMinutes(EXTRA_DAYS.find((d) => d.id === 'M')!)).toBeGreaterThanOrEqual(12);
+  });
+  it('steg per sida delas i vänster och höger', () => {
+    const flat = expandFlow([
+      { name: 'A', cue: 'x', sec: 30 },
+      { name: 'B', cue: 'y', sec: 45, perSide: true },
+    ]);
+    expect(flat.map((x) => x.title)).toEqual(['A', 'B · vänster', 'B · höger']);
+    expect(flowSeconds([{ name: 'B', cue: 'y', sec: 45, perSide: true }])).toBe(90);
+  });
+  it('flödesplanen har ett segment per steg, mjuk signal vid varje byte och slutsignal', () => {
+    const p = buildFlowPlan(
+      [
+        { name: 'A', cue: 'x', sec: 30 },
+        { name: 'B', cue: 'y', sec: 45, perSide: true },
+      ],
+      5,
+    );
+    expect(p.kind).toBe('flow');
+    expect(p.totalMs).toBe(5000 + (30 + 90) * 1000);
+    const flow = p.segments.filter((x) => x.kind === 'flow');
+    expect(flow.map((x) => x.label)).toEqual(['Steg 1 av 3', 'Steg 2 av 3', 'Steg 3 av 3']);
+    expect(flow[0].next).toBe('B · vänster');
+    expect(flow[2].next).toBe('Klart');
+    expect(p.events.filter((e) => e.sound === 'rest').map((e) => e.at)).toEqual([5000, 35000, 80000]);
+    expect(p.events.at(-1)).toEqual({ at: p.totalMs, sound: 'final' });
+    expect(stateAt(p, 40000).segment.title).toBe('B · vänster');
   });
 });

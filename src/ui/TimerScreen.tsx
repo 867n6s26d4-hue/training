@@ -122,7 +122,7 @@ export function TimerScreen({ title, spec, leadInSec, onClose }: Props) {
       </div>
       <div class="timer-mid">
         <div class="timer-phase">
-          {seg.kind === 'leadin' ? 'Förbered' : seg.kind === 'rest' ? 'Vila' : seg.kind === 'amrap' ? 'AMRAP' : seg.kind === 'fortime' ? 'På tid' : 'Kör'}
+          {seg.label ? seg.label : seg.kind === 'leadin' ? 'Förbered' : seg.kind === 'rest' ? 'Vila' : seg.kind === 'amrap' ? 'AMRAP' : seg.kind === 'fortime' ? 'På tid' : 'Kör'}
         </div>
         <div class="timer-clock tnum">
           {seg.kind === 'fortime' ? fmtElapsed(engine.elapsed() - seg.start) : fmtClock(st.segRemainingMs)}

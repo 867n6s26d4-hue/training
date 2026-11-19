@@ -221,3 +221,21 @@ p { margin: 0; }
 .ss-round + .ss-round { margin-top: 6px; }
 .ss-round-label { text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }
 .set-row.next:not(.done) { border-color: var(--accent); }
+
+/* Extrapass på hemskärmen */
+.extras { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn.extra { flex-direction: row; justify-content: space-between; align-items: baseline; gap: 6px; min-height: 46px; padding: 0 12px; text-align: left; border-radius: 16px; }
+.btn.extra b { font-size: 15px; white-space: nowrap; }
+.btn.extra span { font-size: 12px; white-space: nowrap; }
+
+/* Hemskärmen: kompaktare för att rymma extrapassen på smala telefoner */
+.screen.home { gap: 10px; }
+.home .hero2 { padding: 14px; gap: 8px; }
+.home .lift { padding: 7px 0; }
+.home .dot { width: 34px; height: 34px; }
+.home .wd { gap: 3px; }
+.other .btn.day { min-height: 44px; }
+
+.btn.extra { align-items: center; }
+.timer-screen[data-kind='flow'] { --tb: var(--tb-amrap); --tf: var(--tf-amrap); }
+.hiit-list { padding-left: 2.2em; }

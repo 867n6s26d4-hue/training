@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { ExerciseLog, ExerciseState, HiitLog, Session, SetLog, Settings } from '../types';
 import { getDay, getExercise, hiitName, hiitResultText, hiitTitleFor, restText, targetText } from '../data/program';
 import { fmtKg } from '../logic/progression';
-import { nextInSuperset, restAfterSet, supersetPair } from '../logic/superset';
+import { nextSet, restAfterSet, supersetPairs } from '../logic/superset';
 import { platesPerSide } from '../logic/plates';
 import { buildRestPlan, fmtClock } from '../logic/timerPlan';
 import { engine } from '../timer';
@@ -38,7 +38,7 @@ function lastText(last: { sets: SetLog[] } | undefined, kind: string): string | 
 export function Workout({ session, states, settings, onChange, onFinish, onDiscard, onBack }: Props) {
   const day = getDay(session.dayId);
   const hiit = session.hiitSpec;
-  const hiitTitle = hiitName(hiit);
+  const hiitTitle = hiit ? hiitName(hiit) : '';
   const [last, setLast] = useState<Last>({});
   const [hiitOpen, setHiitOpen] = useState(false);
   const [confirm, setConfirm] = useState<'finish' | 'discard' | null>(null);
@@ -93,7 +93,7 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
       };
     });
 
-  const pair = supersetPair(session.items, day.superset);
+  const pairs = supersetPairs(session.items, day.superset);
 
   const toggleDone = (i: number, j: number) => {
     const ex = session.strength[i];
@@ -101,7 +101,7 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
     setSet(i, j, { done: nowDone });
     if (!nowDone) return;
     const allDone = session.strength.every((e, a) => e.sets.every((x, b) => (a === i && b === j) || x.done));
-    const rest = restAfterSet(session.items, session.strength.map((e) => e.sets.length), pair, i, j);
+    const rest = restAfterSet(session.items, session.strength.map((e) => e.sets.length), pairs, i, j);
     if (allDone) void unlockAudio(settings.audioSession);
     else if (rest > 0) startRest(rest);
   };
@@ -119,7 +119,7 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
     if (result) onChange((s) => ({ ...s, hiit: result }));
   };
 
-  if (hiitOpen) {
+  if (hiitOpen && hiit) {
     return <TimerScreen title={hiitTitle} spec={hiit} leadInSec={settings.leadInSec} onClose={closeHiit} />;
   }
 
@@ -133,8 +133,8 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
           ‹ Hem
         </button>
         <div class="topbar-title">
-          Pass {day.id}
-          <span class="tag">Block {session.block + 1}</span>
+          {day.name ?? `Pass ${day.id}`}
+          {!day.extra && <span class="tag">Block {session.block + 1}</span>}
           {session.deload && <span class="tag warn">Deload</span>}
         </div>
         <div class="muted tnum">{fmtTime(session.startedAt)}</div>
@@ -143,18 +143,20 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
       <h1 class="h1">{day.title}</h1>
       <p class="muted">{day.focus}</p>
 
-      <div class="callout">
-        <b>Uppvärmning ca 3 min:</b> {day.warmup}
-      </div>
+      {day.warmup && (
+        <div class="callout">
+          <b>Uppvärmning ca 3 min:</b> {day.warmup}
+        </div>
+      )}
       {session.deload && (
         <div class="callout warn">
           Deload-pass: färre set (ca 60 % volym), samma vikt. Ingen progression räknas för det här passet.
         </div>
       )}
 
-      <h2 class="h2">Del 1 · Styrka</h2>
+      {session.items.length > 0 && <h2 class="h2">{day.finisher === 'none' ? 'Styrka' : 'Del 1 · Styrka'}</h2>}
       {(() => {
-        const next = nextInSuperset(session.strength, pair);
+        const next = nextSet(session.strength, pairs);
         const exHead = (i: number, badge?: string) => {
           const item = session.items[i];
           const def = getExercise(item.exerciseId);
@@ -177,7 +179,7 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
                   {def.note && <div class="muted small-text">{def.note}</div>}
                 </div>
                 <div class="ex-target">
-                  <div class="tnum">{targetText(ex.sets.length, item.repsMin, item.repsMax, session.deload ? undefined : item.targetLabel)}</div>
+                  <div class="tnum">{targetText(ex.sets.length, item.repsMin, item.repsMax, session.deload ? undefined : item.targetLabel, def.unit)}</div>
                   {!badge && <div class="muted small-text">vila {restText(item.restSec)}</div>}
                 </div>
               </div>
@@ -223,7 +225,7 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
                 />
               )}
               <Stepper
-                label={def.repsSuffix ? `reps${def.repsSuffix}` : 'reps'}
+                label={def.unit ? `sek${def.repsSuffix ?? ''}` : def.repsSuffix ? `rep${def.repsSuffix}` : 'reps'}
                 value={set.reps}
                 step={1}
                 onChange={(v) => setSet(i, j, { reps: v })}
@@ -242,12 +244,13 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
 
         const blocks: preact.JSX.Element[] = [];
         for (let i = 0; i < session.items.length; i++) {
-          if (pair && i === pair[0]) {
+          const pair = pairs.find((p) => p[0] === i);
+          if (pair) {
             const [a, b] = pair;
             const rounds = Math.max(session.strength[a].sets.length, session.strength[b].sets.length);
             const restSec = Math.max(session.items[a].restSec, session.items[b].restSec);
             blocks.push(
-              <section class="card ex superset" key="superset">
+              <section class="card ex superset" key={`superset-${a}`}>
                 <div class="ss-title">
                   <span class="tag ok">Superset</span>
                   <span class="muted small-text">växla mellan övningarna · vila {restText(restSec)} efter paret</span>
@@ -265,7 +268,7 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
                 </div>
               </section>,
             );
-            i = pair[1];
+            i = b;
             continue;
           }
           blocks.push(
@@ -278,49 +281,57 @@ export function Workout({ session, states, settings, onChange, onFinish, onDisca
         return blocks;
       })()}
 
-      <h2 class="h2">Del 2 · Högintensivt</h2>
-      <section class="card hiit">
-        <div class="ex-name">{hiitTitle}</div>
-        <div class="muted small-text">
-          {hiitTitleFor(hiit)}
-          {hiit.kind === 'fortime' && hiit.rounds && hiit.rounds > 1 ? ` · ${hiit.rounds} varv` : ''}
-        </div>
-        {hiit.note && <div class="muted small-text">{hiit.note}</div>}
-        <ol class="hiit-list">
-          {hiit.items.map((it, k) => (
-            <li key={k}>{it}</li>
-          ))}
-        </ol>
-        {hiit.kind === 'intervals' && (
-          <div class="muted small-text">
-            {hiit.rounds} varv × {hiit.items.length} övningar, {hiit.workSec} s arbete / {hiit.restSec} s vila (ca{' '}
-            {Math.round((hiit.rounds * hiit.items.length * (hiit.workSec + hiit.restSec) - hiit.restSec) / 60)} min)
-          </div>
-        )}
-        {session.hiit ? (
-          <div class="result-line">
-            <span class="tag ok">Klar</span>
-            <span> {hiitResultText(session.hiit)}</span>
-            {session.hiit.note && <span class="muted"> · {session.hiit.note}</span>}
-            <button class="btn ghost small" onClick={openHiit}>
-              Kör igen
-            </button>
-          </div>
-        ) : (
-          <button class="btn primary xl" onClick={openHiit}>
-            Starta {{ emom: 'EMOM', e2mom: 'E2MOM', amrap: 'AMRAP', fortime: 'På tid', intervals: 'intervaller' }[hiit.kind]}
-          </button>
-        )}
-        {!session.hiit && (
-          <button class="btn ghost small swap" onClick={() => onChange((s) => swapHiit(s))}>
-            Byt upplägg
-          </button>
-        )}
-      </section>
+      {hiit && (
+        <>
+          <h2 class="h2">
+            {hiit.kind === 'flow' ? (session.items.length ? 'Del 2 · Rörlighet' : 'Rörlighetsflöde') : 'Del 2 · Högintensivt'}
+          </h2>
+          <section class="card hiit">
+            <div class="ex-name">{hiitTitle}</div>
+            <div class="muted small-text">
+              {hiitTitleFor(hiit)}
+              {hiit.kind === 'fortime' && hiit.rounds && hiit.rounds > 1 ? ` · ${hiit.rounds} varv` : ''}
+            </div>
+            {hiit.note && <div class="muted small-text">{hiit.note}</div>}
+            <ol class="hiit-list">
+              {hiit.items.map((it, k) => (
+                <li key={k}>{it}</li>
+              ))}
+            </ol>
+            {hiit.kind === 'intervals' && (
+              <div class="muted small-text">
+                {hiit.rounds} varv × {hiit.items.length} övningar, {hiit.workSec} s arbete / {hiit.restSec} s vila (ca{' '}
+                {Math.round((hiit.rounds * hiit.items.length * (hiit.workSec + hiit.restSec) - hiit.restSec) / 60)} min)
+              </div>
+            )}
+            {session.hiit ? (
+              <div class="result-line">
+                <span class="tag ok">Klar</span>
+                <span> {hiitResultText(session.hiit)}</span>
+                {session.hiit.note && <span class="muted"> · {session.hiit.note}</span>}
+                <button class="btn ghost small" onClick={openHiit}>
+                  Kör igen
+                </button>
+              </div>
+            ) : (
+              <button class="btn primary xl" onClick={openHiit}>
+                {hiit.kind === 'flow' ? 'Starta flödet' : `Starta ${{ emom: 'EMOM', e2mom: 'E2MOM', amrap: 'AMRAP', fortime: 'På tid', intervals: 'intervaller' }[hiit.kind]}`}
+              </button>
+            )}
+            {!session.hiit && (
+              <button class="btn ghost small swap" onClick={() => onChange((s) => swapHiit(s))}>
+                Byt upplägg
+              </button>
+            )}
+          </section>
+        </>
+      )}
 
       <div class="finish">
         <div class="muted tnum">
-          {doneSets} av {totalSets} set klara{session.hiit ? ' · HIIT klar' : ''}
+          {totalSets > 0 && `${doneSets} av ${totalSets} set klara`}
+          {totalSets > 0 && session.hiit ? ' · ' : ''}
+          {session.hiit ? (hiit?.kind === 'flow' ? 'Flöde klart' : 'HIIT klar') : ''}
         </div>
         {confirm === 'finish' ? (
           <div class="row gap">

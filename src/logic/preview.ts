@@ -17,7 +17,7 @@ export function describeItem(
   last: { sets: SetLog[] } | undefined,
 ): PreviewRow {
   const def = getExercise(item.exerciseId);
-  const target = targetText(item.sets, item.repsMin, item.repsMax, item.targetLabel);
+  const target = targetText(item.sets, item.repsMin, item.repsMax, item.targetLabel, def.unit);
   const row: PreviewRow = { name: def.name, target, up: false };
   if (def.kind === 'bodyweight') return row;
   const w = log.sets[0]?.weight ?? null;

@@ -1,7 +1,10 @@
 import { METCONS } from './metcons';
+import { EXTRA_EXERCISES, FLOWS, SHOULDER_CORE_PAIRS, SHOULDER_CORE_SLOTS } from './extras';
+import { flowSeconds } from '../logic/timerPlan';
 import type { DayDef, DayId, ExerciseDef, HiitSpec, SlotDef, StrengthItem } from '../types';
 
 export const EXERCISES: Record<string, ExerciseDef> = {
+  ...EXTRA_EXERCISES,
   // Baslyft
   squat: { id: 'squat', name: 'Knäböj', note: 'Frontböj (clean till axlarna) eller bakböj', kind: 'barbell' },
   dbsquat: {
@@ -130,7 +133,8 @@ export const DAYS: DayDef[] = [
     focus: 'Knäböj, bänkpress, rodd',
     warmup: 'Lätta set av knäböjen (t.ex. 2×5 med tom stång och 50 %), armcirklar, några bandrodd.',
     slots: slotsA,
-    superset: ['bench', 'row'],
+    superset: [['bench', 'row']],
+    finisher: 'hiit',
   },
   {
     id: 'B',
@@ -138,7 +142,8 @@ export const DAYS: DayDef[] = [
     focus: 'Marklyft, press, enbensböj',
     warmup: 'Lätta set marklyft (tom stång, sedan 50 %), höftmobilitet, 10 gobletböj med lätt hantel.',
     slots: slotsB,
-    superset: ['press', 'legs'],
+    superset: [['press', 'legs']],
+    finisher: 'hiit',
   },
   {
     id: 'C',
@@ -146,12 +151,42 @@ export const DAYS: DayDef[] = [
     focus: 'Chins, rumänskt marklyft, triceps',
     warmup: 'Hänga i stången 2×20 s, 8 skulderblads-chins (scapula pull), lätta set rumänskt marklyft.',
     slots: slotsC,
-    superset: ['chins', 'tri'],
+    superset: [['chins', 'tri']],
+    finisher: 'hiit',
   },
 ];
 
+/** Extrapass utanför A → B → C-cykeln */
+export const EXTRA_DAYS: DayDef[] = [
+  {
+    id: 'M',
+    name: 'Rörlighet',
+    extra: true,
+    title: 'Rörlighet',
+    focus: 'Höfter, bröstrygg, axlar och vader',
+    warmup: '',
+    slots: [],
+    finisher: 'flow',
+  },
+  {
+    id: 'S',
+    name: 'Axlar + core',
+    extra: true,
+    title: 'Axlar och core',
+    focus: 'Rotatorkuff, skulderblad och bål',
+    warmup: 'Armcirklar, 10 bandspridningar och 5 katt–ko.',
+    slots: SHOULDER_CORE_SLOTS,
+    superset: SHOULDER_CORE_PAIRS,
+    finisher: 'none',
+    strengthMin: 24,
+  },
+];
+
+/** Alla pass: rotationen A, B, C och extrapassen */
+export const ALL_DAYS: DayDef[] = [...DAYS, ...EXTRA_DAYS];
+
 export function getDay(id: DayId): DayDef {
-  const d = DAYS.find((x) => x.id === id);
+  const d = ALL_DAYS.find((x) => x.id === id);
   if (!d) throw new Error('Okänt pass: ' + id);
   return d;
 }
@@ -182,14 +217,18 @@ const KIND_ORDER: HiitSpec['kind'][] = ['fortime', 'amrap', 'emom', 'e2mom', 'in
  * Ordningen varvar format (på tid, AMRAP, EMOM, E2MOM, intervaller) så att två pass i rad sällan har samma format.
  */
 export function hiitPool(dayId: DayId): HiitSpec[] {
+  const finisher = getDay(dayId).finisher;
+  if (finisher === 'none') return [];
+  if (finisher === 'flow') return FLOWS;
   const groups = KIND_ORDER.map((k) => METCONS.filter((m) => m.spec.kind === k && !m.avoid?.includes(dayId)).map((m) => m.spec));
   const out: HiitSpec[] = [];
   for (let i = 0; groups.some((g) => i < g.length); i++) for (const g of groups) if (i < g.length) out.push(g[i]);
   return out;
 }
 
-export function pickHiit(dayId: DayId, rotation: number): { spec: HiitSpec; variant: number } {
+export function pickHiit(dayId: DayId, rotation: number): { spec: HiitSpec | undefined; variant: number } {
   const pool = hiitPool(dayId);
+  if (!pool.length) return { spec: undefined, variant: 0 };
   const variant = rotation % pool.length;
   return { spec: pool[variant], variant };
 }
@@ -207,6 +246,8 @@ export function hiitTitleFor(spec: HiitSpec): string {
       return `På tid · max ${spec.capMinutes} min`;
     case 'intervals':
       return `${spec.rounds} varv · ${spec.workSec}/${spec.restSec} s`;
+    case 'flow':
+      return `Flöde · ca ${Math.round(flowSeconds(spec.steps) / 60)} min`;
   }
 }
 
@@ -233,14 +274,17 @@ export function hiitMinutes(h: HiitSpec): number {
       return (h.items.length * h.rounds * (h.workSec + h.restSec) - h.restSec) / 60;
     case 'fortime':
       return Math.round(h.capMinutes * 0.8);
+    case 'flow':
+      return flowSeconds(h.steps) / 60;
     default:
       return h.minutes;
   }
 }
 
-export function targetText(sets: number, repsMin: number, repsMax: number, label?: string): string {
+export function targetText(sets: number, repsMin: number, repsMax: number, label?: string, unit?: 'sek'): string {
   if (label) return label;
-  return repsMin === repsMax ? `${sets} × ${repsMax}` : `${sets} × ${repsMin}–${repsMax}`;
+  const u = unit ? ' s' : '';
+  return repsMin === repsMax ? `${sets} × ${repsMax}${u}` : `${sets} × ${repsMin}–${repsMax}${u}`;
 }
 
 export function restText(sec: number): string {
@@ -249,7 +293,10 @@ export function restText(sec: number): string {
   return `${sec} s`;
 }
 
-/** Uppskattad passlängd i minuter: uppvärmning + styrka (ca 22 min enligt programmet) + HIIT */
+/** Uppskattad passlängd i minuter: uppvärmning (3 min) + styrka (22 min om inget annat anges) + HIIT eller flöde */
 export function estimateMinutes(day: DayDef, hiit?: HiitSpec): number {
-  return Math.round(3 + 22 + hiitMinutes(hiit ?? hiitPool(day.id)[0]));
+  const warm = day.warmup ? 3 : 0;
+  const strength = day.slots.length ? (day.strengthMin ?? 22) : 0;
+  const spec = hiit ?? hiitPool(day.id)[0];
+  return Math.round(warm + strength + (spec ? hiitMinutes(spec) : 0));
 }

@@ -1,23 +1,25 @@
-import type { HiitSpec } from '../types';
+import type { FlowStep, HiitSpec } from '../types';
 
 export type SoundId = 'tick' | 'go' | 'rest' | 'warn' | 'final';
 export interface TimerEvent {
   at: number;
   sound: SoundId;
 }
-export type SegmentKind = 'leadin' | 'work' | 'rest' | 'minute' | 'amrap' | 'fortime';
+export type SegmentKind = 'leadin' | 'work' | 'rest' | 'minute' | 'amrap' | 'fortime' | 'flow';
 export interface Segment {
   start: number;
   end: number;
   kind: SegmentKind;
   title: string;
+  /** Liten text ovanför klockan, t.ex. "Steg 3 av 22" */
+  label?: string;
   detail?: string;
   /** Rader att visa som lista (AMRAP, På tid) */
   lines?: string[];
   next?: string;
 }
 export interface Plan {
-  kind: 'rest' | 'emom' | 'e2mom' | 'intervals' | 'amrap' | 'fortime';
+  kind: 'rest' | 'emom' | 'e2mom' | 'intervals' | 'amrap' | 'fortime' | 'flow';
   totalMs: number;
   events: TimerEvent[];
   segments: Segment[];
@@ -214,6 +216,50 @@ export function buildFortimePlan(capMinutes: number, items: string[], name = 'P�
   return { kind: 'fortime', totalMs: total, events: sortEvents(events), segments };
 }
 
+/** Steg med per-sida-steg uppdelade i vänster och höger */
+export function expandFlow(steps: FlowStep[]): { title: string; cue: string; sec: number }[] {
+  return steps.flatMap((s) =>
+    s.perSide
+      ? [
+          { title: `${s.name} · vänster`, cue: s.cue, sec: s.sec },
+          { title: `${s.name} · höger`, cue: s.cue, sec: s.sec },
+        ]
+      : [{ title: s.name, cue: s.cue, sec: s.sec }],
+  );
+}
+
+export function flowSeconds(steps: FlowStep[]): number {
+  return expandFlow(steps).reduce((n, x) => n + x.sec, 0);
+}
+
+/** Rörlighetsflöde: steg av olika längd efter varandra. Mjuk signal vid varje stegbyte, tydlig i slutet. */
+export function buildFlowPlan(steps: FlowStep[], leadInSec = 5): Plan {
+  const L = leadInSec * 1000;
+  const flat = expandFlow(steps);
+  const segments: Segment[] = [];
+  const events: TimerEvent[] = [];
+  if (L > 0) {
+    segments.push({ start: 0, end: L, kind: 'leadin', title: 'Gör dig redo', next: flat[0]?.title });
+    events.push(...ticksBefore(L, 0));
+  }
+  let t = L;
+  flat.forEach((x, i) => {
+    segments.push({
+      start: t,
+      end: t + x.sec * 1000,
+      kind: 'flow',
+      label: `Steg ${i + 1} av ${flat.length}`,
+      title: x.title,
+      detail: x.cue,
+      next: i + 1 < flat.length ? flat[i + 1].title : 'Klart',
+    });
+    events.push({ at: t, sound: 'rest' });
+    t += x.sec * 1000;
+  });
+  events.push({ at: t, sound: 'final' });
+  return { kind: 'flow', totalMs: t, events: sortEvents(events), segments };
+}
+
 export function buildHiitPlan(spec: HiitSpec, leadInSec = 5): Plan {
   switch (spec.kind) {
     case 'emom':
@@ -224,6 +270,8 @@ export function buildHiitPlan(spec: HiitSpec, leadInSec = 5): Plan {
       return buildAmrapPlan(spec.minutes, spec.items, leadInSec);
     case 'e2mom':
       return buildE2momPlan(spec.minutes, spec.items, leadInSec);
+    case 'flow':
+      return buildFlowPlan(spec.steps, leadInSec);
     case 'fortime':
       return buildFortimePlan(spec.capMinutes, spec.items, spec.name, leadInSec);
   }

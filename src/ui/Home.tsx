@@ -1,5 +1,5 @@
 import type { DayId, Session, Settings } from '../types';
-import { DAYS, estimateMinutes, getDay, hiitTitleFor } from '../data/program';
+import { DAYS, EXTRA_DAYS, estimateMinutes, getDay, hiitTitleFor } from '../data/program';
 import { describeItem } from '../logic/preview';
 import { weekDays, weekStreak } from '../logic/stats';
 import { useLive } from '../hooks';
@@ -58,7 +58,7 @@ export function Home({ active, done, next, deloadSuggested, settings, onStart, o
         <h1 class="hero-name">{day.title}</h1>
         <div class="chips">
           <span class="chip">ca {estimateMinutes(day, preview?.hiitSpec)} min</span>
-          <span class="chip">Block {(active ? active.block : settings.blockIndex) + 1}</span>
+          {!day.extra && <span class="chip">Block {(active ? active.block : settings.blockIndex) + 1}</span>}
           {(active ? active.deload : settings.deloadRemaining > 0) && <span class="chip warn">Deload</span>}
         </div>
         {!active && rows && preview && (
@@ -72,10 +72,12 @@ export function Home({ active, done, next, deloadSuggested, settings, onStart, o
                 </span>
               </div>
             ))}
-            <div class="lift">
-              <b>{preview.hiitSpec.name ?? 'HIIT'}</b>
-              <span class="tnum">{hiitTitleFor(preview.hiitSpec)}</span>
-            </div>
+            {preview.hiitSpec && (
+              <div class="lift">
+                <b>{preview.hiitSpec.name ?? 'HIIT'}</b>
+                <span class="tnum">{hiitTitleFor(preview.hiitSpec)}</span>
+              </div>
+            )}
           </div>
         )}
         <button class="btn primary xl" onClick={() => (active ? onResume() : onStart(heroDay))}>
@@ -116,6 +118,16 @@ export function Home({ active, done, next, deloadSuggested, settings, onStart, o
           {DAYS.map((d) => (
             <button class="btn day" key={d.id} onClick={() => onStart(d.id)} aria-label={`Starta pass ${d.id}: ${d.title}`} title={d.title}>
               {d.id}
+            </button>
+          ))}
+        </div>
+      )}
+      {!active && (
+        <div class="extras">
+          {EXTRA_DAYS.map((d) => (
+            <button class="btn extra" key={d.id} onClick={() => onStart(d.id)} aria-label={`Starta ${d.name}: ${d.focus}`}>
+              <b>{d.name}</b>
+              <span class="muted tnum">ca {estimateMinutes(d)} min</span>
             </button>
           ))}
         </div>

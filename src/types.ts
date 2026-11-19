@@ -1,4 +1,5 @@
-export type DayId = 'A' | 'B' | 'C';
+/** A, B och C är rotationen. M (rörlighet) och S (axlar + core) är extrapass utanför den. */
+export type DayId = 'A' | 'B' | 'C' | 'M' | 'S';
 export type ExerciseKind = 'barbell' | 'dumbbell' | 'bodyweight' | 'weighted-bodyweight';
 
 export interface ExerciseDef {
@@ -8,6 +9,8 @@ export interface ExerciseDef {
   kind: ExerciseKind;
   /** Visas bredvid reps, t.ex. "per ben" */
   repsSuffix?: string;
+  /** Tidshåll: "reps" är sekunder */
+  unit?: 'sek';
 }
 
 export type Progression = { kind: 'weight'; inc: number } | { kind: 'reps' };
@@ -33,7 +36,16 @@ interface HiitBase {
    */
   items: string[];
 }
+/** Ett steg i ett rörlighetsflöde. Med `perSide` görs steget en gång per sida (vänster, sedan höger). */
+export interface FlowStep {
+  name: string;
+  cue: string;
+  sec: number;
+  perSide?: boolean;
+}
+
 export type HiitSpec =
+  | (HiitBase & { kind: 'flow'; steps: FlowStep[] })
   | (HiitBase & { kind: 'emom'; minutes: number })
   | (HiitBase & { kind: 'e2mom'; minutes: number })
   | (HiitBase & { kind: 'intervals'; workSec: number; restSec: number; rounds: number })
@@ -58,8 +70,16 @@ export interface DayDef {
   focus: string;
   warmup: string;
   slots: SlotDef[];
-  /** Två slots som körs som superset: ett set av vardera växelvis, vila efter paret */
-  superset?: [string, string];
+  /** Slots som körs som superset-par: ett set av vardera växelvis, vila efter paret. Paren ligger intill varandra. */
+  superset?: [string, string][];
+  /** Visningsnamn för extrapass, t.ex. "Rörlighet". Annars "Pass A". */
+  name?: string;
+  /** Extrapass ingår inte i A → B → C, blockbyte eller deload */
+  extra?: boolean;
+  /** Vad som kommer efter styrkan: HIIT, ett rörlighetsflöde eller ingenting */
+  finisher: 'hiit' | 'flow' | 'none';
+  /** Uppskattad styrketid i minuter (standard 22) */
+  strengthMin?: number;
   /** Alla alternativ har samma format och längd, bara olika övningar */
 }
 
@@ -108,7 +128,8 @@ export interface Session {
   items: PlanItem[];
   /** Vald variant per plats, för komplementövningar */
   variants: Record<string, number>;
-  hiitSpec: HiitSpec;
+  /** Saknas för pass utan HIIT eller flöde */
+  hiitSpec?: HiitSpec;
   hiitVariant: number;
   strength: ExerciseLog[];
   hiit?: HiitLog;

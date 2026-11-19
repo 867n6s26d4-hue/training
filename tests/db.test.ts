@@ -76,7 +76,7 @@ describe('pass och progression', () => {
   it('komplementövningar och HIIT roterar medan baslyften ligger fast inom blocket', async () => {
     const ids = async (day: 'A' | 'B' | 'C') => {
       const s = await startSession(day, Date.now());
-      const r = { items: s.items.map((i) => i.exerciseId), hiit: s.hiitSpec.name, hiitKind: s.hiitSpec.kind };
+      const r = { items: s.items.map((i) => i.exerciseId), hiit: s.hiitSpec!.name, hiitKind: s.hiitSpec!.kind };
       await completeAll(s.id!, {});
       await finishSession(s.id!);
       return r;
@@ -160,6 +160,94 @@ describe('pass och progression', () => {
     }
     expect(await deloadSuggested(1000 + 4 * week)).toBe(false);
     expect(await deloadSuggested(1000 + 6 * week)).toBe(true);
+  });
+});
+
+describe('extrapass utanför A → B → C', () => {
+  it('rörlighet och axlar + core påverkar inte nästa pass i cykeln', async () => {
+    const a = await startSession('A', 1000);
+    await completeAll(a.id!, {});
+    await finishSession(a.id!, 2000);
+    expect(await suggestNextDay()).toBe('B');
+    for (const extra of ['S', 'M'] as const) {
+      const e = await startSession(extra, 3000);
+      await completeAll(e.id!, {});
+      await finishSession(e.id!, 4000);
+      expect(await suggestNextDay()).toBe('B');
+    }
+    // och rotationen fortsätter som vanligt
+    const b = await startSession('B', 5000);
+    await completeAll(b.id!, {});
+    await finishSession(b.id!, 6000);
+    expect(await suggestNextDay()).toBe('C');
+  });
+
+  it('axlar + core har sex övningar utan HIIT, och rörlighet har ett flöde utan styrka', async () => {
+    const s = await startSession('S', 1000);
+    expect(s.items).toHaveLength(6);
+    expect(s.hiitSpec).toBeUndefined();
+    expect(s.strength.every((e) => e.sets.length === 3)).toBe(true);
+    expect(swapHiit(s)).toBe(s);
+    await completeAll(s.id!, {});
+    await finishSession(s.id!, 2000);
+    const m = await startSession('M', 3000);
+    expect(m.items).toHaveLength(0);
+    expect(m.hiitSpec?.kind).toBe('flow');
+  });
+
+  it('rörlighetsflödena roterar mellan passen och kan bytas', async () => {
+    const names: (string | undefined)[] = [];
+    for (let i = 0; i < 3; i++) {
+      const m = await startSession('M', 1000 + i);
+      names.push(m.hiitSpec?.name);
+      const act = (await getActiveSession())!;
+      act.hiit = { kind: 'flow', completed: true };
+      await saveSession(act);
+      await finishSession(m.id!, 2000 + i);
+    }
+    expect(new Set(names).size).toBe(3);
+    const m4 = await startSession('M', 9000);
+    expect(m4.hiitSpec?.name).toBe(names[0]);
+    expect(swapHiit(m4).hiitSpec?.name).toBe(names[1]);
+  });
+
+  it('deload gäller inte extrapass och räknas inte ner av dem', async () => {
+    await setDeload(true);
+    const s = await startSession('S', 1000);
+    expect(s.deload).toBe(false);
+    expect(s.strength.every((e) => e.sets.length === 3)).toBe(true);
+    await completeAll(s.id!, {});
+    await finishSession(s.id!, 2000);
+    expect((await getSettings()).deloadRemaining).toBe(3);
+  });
+
+  it('axelövningar får egen progression, och tidshåll ger svårare variant på toppen', async () => {
+    const s = await startSession('S', 1000);
+    await completeAll(s.id!, { erside: 2.5 }, { plank: [60, 60, 60] });
+    const done = await finishSession(s.id!, 2000);
+    expect(done.changes?.find((c) => c.exerciseId === 'erside')).toMatchObject({ reason: 'hold' });
+    expect(done.changes?.find((c) => c.exerciseId === 'plank')?.harder).toBe(true);
+    const states = await loadStates();
+    expect(states.erside?.weight).toBe(2.5);
+  });
+
+  it('deloadförslaget räknar bara pass i cykeln', async () => {
+    for (let i = 0; i < 5; i++) {
+      const s = await startSession('A', 1000 + i);
+      await completeAll(s.id!, {});
+      await finishSession(s.id!, 2000 + i);
+    }
+    for (let i = 0; i < 3; i++) {
+      const s = await startSession('S', 3000 + i);
+      await completeAll(s.id!, {});
+      await finishSession(s.id!, 4000 + i);
+    }
+    const later = Date.now() + 8 * 7 * 24 * 3600 * 1000;
+    expect(await deloadSuggested(later)).toBe(false);
+    const s = await startSession('B', 5000);
+    await completeAll(s.id!, {});
+    await finishSession(s.id!, 6000);
+    expect(await deloadSuggested(later)).toBe(true);
   });
 });
 

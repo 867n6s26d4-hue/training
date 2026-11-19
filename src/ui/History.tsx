@@ -11,7 +11,7 @@ function exerciseLine(ex: Session['strength'][number]): string | null {
   const w = done[0].weight;
   const parts = [def.name];
   if (def.kind !== 'bodyweight' && w !== null) parts.push(`${fmtKg(w)} kg`);
-  parts.push(reps);
+  parts.push(def.unit ? `${reps} s` : reps);
   if (ex.level) parts.push(`(${ex.level})`);
   return parts.join(' · ');
 }
@@ -28,7 +28,7 @@ export function History({ sessions }: { sessions: Session[] }) {
           <div class="hist-head">
             <div>
               <b>
-                Pass {s.dayId} · {getDay(s.dayId).title}
+                {getDay(s.dayId).name ?? `Pass ${s.dayId}`} · {getDay(s.dayId).title}
               </b>
               <div class="muted small-text">
                 {fmtDate(s.startedAt)}

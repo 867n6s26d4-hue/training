@@ -1,5 +1,5 @@
 import type { Session } from '../types';
-import { getExercise } from '../data/program';
+import { getDay, getExercise } from '../data/program';
 import { fmtKg } from '../logic/progression';
 import { fmtDuration } from '../format';
 
@@ -10,13 +10,14 @@ export function Summary({ session, onClose }: { session: Session; onClose: () =>
         <div class="brand">Bra jobbat</div>
       </header>
       <section class="card hero">
-        <div class="hero-title">Pass {session.dayId} sparat</div>
+        <div class="hero-title">{getDay(session.dayId).name ?? `Pass ${session.dayId}`} sparat</div>
         <div class="muted">
           {session.endedAt ? fmtDuration(session.endedAt - session.startedAt) : ''}
           {session.deload ? ' · deload' : ''}
         </div>
       </section>
-      <h2 class="h2">Nästa gång</h2>
+      {(session.changes ?? []).length > 0 && <h2 class="h2">Nästa gång</h2>}
+      {(session.changes ?? []).length > 0 && (
       <section class="card">
         {(session.changes ?? []).map((c) => {
           const def = getExercise(c.exerciseId);
@@ -44,6 +45,7 @@ export function Summary({ session, onClose }: { session: Session; onClose: () =>
           );
         })}
       </section>
+      )}
       <button class="btn primary xl" onClick={onClose}>
         Klar
       </button>

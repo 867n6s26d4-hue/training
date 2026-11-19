@@ -25,3 +25,11 @@ Build command: `npm run build`, output directory: `dist`. Koppla repot under Wor
 Varje passdag får en pool (`hiitPool` i `program.ts`) där formaten varvas, och pass som krockar med
 dagens baslyft (`avoid`) sorteras bort. Lägg till ett pass genom att lägga till en rad i `METCONS`;
 testerna kontrollerar format, längd och att inga lyft över huvudet eller löpning smugit sig in.
+
+## Extrapass utanför A → B → C
+
+- **S, Axlar + core** (`src/data/extras.ts`): sex övningar i tre superset-par (axel/skulderblad + core), 3 set, ingen HIIT.
+  Tidshåll (planka m.fl.) loggas i sekunder. Progression som i övriga pass, men ingen deload.
+- **M, Rörlighet**: tre guidade flöden (helkropp, höft och ben, axlar och rygg) som roterar. Timern byter steg med
+  mjuk signal och visar instruktion per steg. Steg per sida körs vänster, sedan höger.
+- Extrapassen räknas inte i nästa-pass-förslaget, blockbyte, deload eller deloadförslaget, men syns i veckoraden och historiken.
