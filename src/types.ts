@@ -42,6 +42,8 @@ export interface FlowStep {
   cue: string;
   sec: number;
   perSide?: boolean;
+  /** Nyckel till streckfiguren i data/poses.ts */
+  pose?: string;
 }
 
 export type HiitSpec =

@@ -1,3 +1,4 @@
+import { POSE_BY_STEP } from './poses';
 import type { ExerciseDef, FlowStep, HiitSpec, SlotDef, StrengthItem } from '../types';
 
 /**
@@ -178,7 +179,7 @@ export const SHOULDER_CORE_PAIRS: [string, string][] = [
   ['scap', 'hang'],
 ];
 
-const step = (name: string, sec: number, cue: string, perSide = false): FlowStep => ({ name, sec, cue, perSide });
+const step = (name: string, sec: number, cue: string, perSide = false): FlowStep => ({ name, sec, cue, perSide, pose: POSE_BY_STEP[name] });
 
 /** Sammanfattning av ett steg till en rad i listan */
 export function flowLine(s: FlowStep): string {

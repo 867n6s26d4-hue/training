@@ -33,3 +33,6 @@ testerna kontrollerar format, längd och att inga lyft över huvudet eller löpn
 - **M, Rörlighet**: tre guidade flöden (helkropp, höft och ben, axlar och rygg) som roterar. Timern byter steg med
   mjuk signal och visar instruktion per steg. Steg per sida körs vänster, sedan höger.
 - Extrapassen räknas inte i nästa-pass-förslaget, blockbyte, deload eller deloadförslaget, men syns i veckoraden och historiken.
+
+### Bilder i rörlighetsflödena
+Varje flödessteg har en egen streckfigur (SVG-data i `src/data/poses.ts`, ritas av `src/ui/PoseFigure.tsx`) som visas stort på timerskärmen. Stegets namn kopplas till en pose via `POSE_BY_STEP`; höger sida speglas automatiskt. Nytt steg = ny pose i `POSES` (ett test kräver att alla steg har en bild).

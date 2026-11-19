@@ -338,6 +338,7 @@ describe('förhandsvisning', () => {
 import { nextSet, restAfterSet, supersetPairs } from '../src/logic/superset';
 import { ALL_DAYS, EXTRA_DAYS } from '../src/data/program';
 import { FLOWS } from '../src/data/extras';
+import { POSES } from '../src/data/poses';
 import { buildFlowPlan, expandFlow, flowSeconds } from '../src/logic/timerPlan';
 
 describe('superset', () => {
@@ -421,11 +422,22 @@ describe('extrapass: rörlighet', () => {
       for (const st of f.steps) {
         expect(st.cue.length, st.name).toBeGreaterThan(10);
         expect(st.sec, st.name).toBeGreaterThanOrEqual(30);
+        expect(st.pose && POSES[st.pose], `bild saknas för ${st.name}`).toBeTruthy();
       }
       expect(f.items).toHaveLength(f.steps.length);
     }
     expect(hiitPool('M')).toBe(FLOWS);
     expect(estimateMinutes(EXTRA_DAYS.find((d) => d.id === 'M')!)).toBeGreaterThanOrEqual(12);
+  });
+  it('flödessegmenten bär bild, och höger sida speglas', () => {
+    const f = FLOWS.find((x) => x.kind === 'flow')!;
+    if (f.kind !== 'flow') return;
+    const plan = buildFlowPlan(f.steps);
+    const flowSegs = plan.segments.filter((x) => x.kind === 'flow');
+    expect(flowSegs.every((x) => !!x.pose)).toBe(true);
+    expect(flowSegs.some((x) => x.title.endsWith('höger') && x.mirror)).toBe(true);
+    expect(flowSegs.some((x) => x.title.endsWith('vänster') && x.mirror)).toBe(false);
+    expect(plan.segments[0].pose).toBe(flowSegs[0].pose);
   });
   it('steg per sida delas i vänster och höger', () => {
     const flat = expandFlow([

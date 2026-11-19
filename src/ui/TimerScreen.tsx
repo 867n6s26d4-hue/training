@@ -1,3 +1,4 @@
+import { PoseFigure } from './PoseFigure';
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { HiitLog, HiitSpec } from '../types';
 import { buildHiitPlan, fmtClock, fmtElapsed, stateAt } from '../logic/timerPlan';
@@ -128,6 +129,7 @@ export function TimerScreen({ title, spec, leadInSec, onClose }: Props) {
           {seg.kind === 'fortime' ? fmtElapsed(engine.elapsed() - seg.start) : fmtClock(st.segRemainingMs)}
         </div>
         <div class="timer-title">{seg.kind === 'rest' ? 'Vila' : seg.title}</div>
+        {seg.pose && <PoseFigure pose={seg.pose} mirror={seg.mirror} />}
         {seg.detail && <div class="muted timer-detail">{seg.detail}</div>}
         {seg.lines && (
           <ul class="timer-lines">

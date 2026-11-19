@@ -17,6 +17,9 @@ export interface Segment {
   /** Rader att visa som lista (AMRAP, På tid) */
   lines?: string[];
   next?: string;
+  /** Streckfigur (nyckel) och om den ska speglas, för rörlighetssteg */
+  pose?: string;
+  mirror?: boolean;
 }
 export interface Plan {
   kind: 'rest' | 'emom' | 'e2mom' | 'intervals' | 'amrap' | 'fortime' | 'flow';
@@ -217,14 +220,14 @@ export function buildFortimePlan(capMinutes: number, items: string[], name = 'P�
 }
 
 /** Steg med per-sida-steg uppdelade i vänster och höger */
-export function expandFlow(steps: FlowStep[]): { title: string; cue: string; sec: number }[] {
+export function expandFlow(steps: FlowStep[]): { title: string; cue: string; sec: number; pose?: string; mirror?: boolean }[] {
   return steps.flatMap((s) =>
     s.perSide
       ? [
-          { title: `${s.name} · vänster`, cue: s.cue, sec: s.sec },
-          { title: `${s.name} · höger`, cue: s.cue, sec: s.sec },
+          { title: `${s.name} · vänster`, cue: s.cue, sec: s.sec, pose: s.pose },
+          { title: `${s.name} · höger`, cue: s.cue, sec: s.sec, pose: s.pose, mirror: true },
         ]
-      : [{ title: s.name, cue: s.cue, sec: s.sec }],
+      : [{ title: s.name, cue: s.cue, sec: s.sec, pose: s.pose }],
   );
 }
 
@@ -239,7 +242,7 @@ export function buildFlowPlan(steps: FlowStep[], leadInSec = 5): Plan {
   const segments: Segment[] = [];
   const events: TimerEvent[] = [];
   if (L > 0) {
-    segments.push({ start: 0, end: L, kind: 'leadin', title: 'Gör dig redo', next: flat[0]?.title });
+    segments.push({ start: 0, end: L, kind: 'leadin', title: 'Gör dig redo', next: flat[0]?.title, pose: flat[0]?.pose, mirror: flat[0]?.mirror });
     events.push(...ticksBefore(L, 0));
   }
   let t = L;
@@ -251,6 +254,8 @@ export function buildFlowPlan(steps: FlowStep[], leadInSec = 5): Plan {
       label: `Steg ${i + 1} av ${flat.length}`,
       title: x.title,
       detail: x.cue,
+      pose: x.pose,
+      mirror: x.mirror,
       next: i + 1 < flat.length ? flat[i + 1].title : 'Klart',
     });
     events.push({ at: t, sound: 'rest' });
