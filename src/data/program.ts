@@ -1,10 +1,12 @@
 import { METCONS } from './metcons';
 import { EXTRA_EXERCISES, FLOWS, SHOULDER_CORE_PAIRS, SHOULDER_CORE_SLOTS } from './extras';
+import { LIFT_EXERCISES, LIFT_PAIRS, LIFT_SLOTS } from './lifting';
 import { flowSeconds } from '../logic/timerPlan';
 import type { DayDef, DayId, ExerciseDef, HiitSpec, SlotDef, StrengthItem } from '../types';
 
 export const EXERCISES: Record<string, ExerciseDef> = {
   ...EXTRA_EXERCISES,
+  ...LIFT_EXERCISES,
   // Baslyft
   squat: { id: 'squat', name: 'Knäböj', note: 'Frontböj (clean till axlarna) eller bakböj', kind: 'barbell' },
   dbsquat: {
@@ -179,6 +181,18 @@ export const EXTRA_DAYS: DayDef[] = [
     superset: SHOULDER_CORE_PAIRS,
     finisher: 'none',
     strengthMin: 24,
+  },
+  {
+    id: 'L',
+    name: 'Tyngdlyftning',
+    extra: true,
+    title: 'Tyngdlyftning',
+    focus: 'Power clean, drag och frontböj. Inget över huvudet',
+    warmup: 'Tom stång: 2×5 marklyft, 2×5 hang power clean och 5 hoppande axelryckningar. Höftöppnare och armcirklar.',
+    slots: LIFT_SLOTS,
+    superset: LIFT_PAIRS,
+    finisher: 'none',
+    strengthMin: 40,
   },
 ];
 

@@ -169,7 +169,7 @@ describe('extrapass utanför A → B → C', () => {
     await completeAll(a.id!, {});
     await finishSession(a.id!, 2000);
     expect(await suggestNextDay()).toBe('B');
-    for (const extra of ['S', 'M'] as const) {
+    for (const extra of ['S', 'M', 'L'] as const) {
       const e = await startSession(extra, 3000);
       await completeAll(e.id!, {});
       await finishSession(e.id!, 4000);

@@ -1,5 +1,5 @@
 /** A, B och C är rotationen. M (rörlighet) och S (axlar + core) är extrapass utanför den. */
-export type DayId = 'A' | 'B' | 'C' | 'M' | 'S';
+export type DayId = 'A' | 'B' | 'C' | 'M' | 'S' | 'L';
 export type ExerciseKind = 'barbell' | 'dumbbell' | 'bodyweight' | 'weighted-bodyweight';
 
 export interface ExerciseDef {

@@ -223,9 +223,9 @@ p { margin: 0; }
 .set-row.next:not(.done) { border-color: var(--accent); }
 
 /* Extrapass på hemskärmen */
-.extras { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.btn.extra { flex-direction: row; justify-content: space-between; align-items: baseline; gap: 6px; min-height: 46px; padding: 0 12px; text-align: left; border-radius: 16px; }
-.btn.extra b { font-size: 15px; white-space: nowrap; }
+.extras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.btn.extra { flex-direction: column; justify-content: center; align-items: center; gap: 1px; min-height: 52px; padding: 0 6px; text-align: center; border-radius: 16px; }
+.btn.extra b { font-size: 14px; white-space: nowrap; }
 .btn.extra span { font-size: 12px; white-space: nowrap; }
 
 /* Hemskärmen: kompaktare för att rymma extrapassen på smala telefoner */

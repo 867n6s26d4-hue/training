@@ -36,3 +36,6 @@ testerna kontrollerar format, längd och att inga lyft över huvudet eller löpn
 
 ### Bilder i rörlighetsflödena
 Varje flödessteg har en egen streckfigur (SVG-data i `src/data/poses.ts`, ritas av `src/ui/PoseFigure.tsx`) som visas stort på timerskärmen. Stegets namn kopplas till en pose via `POSE_BY_STEP`; höger sida speglas automatiskt. Figurerna rör sig sakta mellan grundläge och slutläge (`MOTION`, SMIL-animation; av om telefonen har minskad rörelse påslagen). Nytt steg = ny pose i `POSES` + ett slutläge i `MOTION` (ett test kräver att alla steg har en bild).
+
+### Extrapass L: Tyngdlyftning
+Valbart pass (`src/data/lifting.ts`) med tyngdlyftningens dragmoment utan lyft över huvudet (takhöjd ca 2 m, inget ställ): hopp/axelryckning, power clean eller hang clean, clean pull eller ryckdrag, frontböj, rumänskt marklyft + hängande benlyft som superset. Ingår inte i A → B → C, blockbyte eller deload.

@@ -477,3 +477,27 @@ describe('extrapass: rörlighet', () => {
     expect(stateAt(p, 40000).segment.title).toBe('B · vänster');
   });
 });
+
+describe('extrapass: tyngdlyftning', () => {
+  const L = EXTRA_DAYS.find((d) => d.id === 'L')!;
+  it('finns som extrapass med övningar som finns, utan HIIT', () => {
+    expect(L.extra).toBe(true);
+    expect(L.finisher).toBe('none');
+    expect(hiitPool('L')).toEqual([]);
+    for (const slot of L.slots) for (const o of slot.options) expect(EXERCISES[o.exerciseId], o.exerciseId).toBeDefined();
+  });
+  it('inget lyft går över huvudet (takhöjd ca 2 m)', () => {
+    const lifts = L.slots.flatMap((sl) => sl.options.map((o) => EXERCISES[o.exerciseId]));
+    for (const e of lifts) expect(e.name, e.id).not.toMatch(/press|stöt|jerk|thruster|overhead|ryck(?!drag|ning)/i);
+    for (const e of lifts.filter((x) => x.id.match(/clean|pull|squat/))) {
+      if (e.id.match(/clean|snatchpull/)) expect(e.note, e.id).toMatch(/över huvudet|axlarna|bröstet|axeln/);
+    }
+  });
+  it('superset-paret ligger intill varandra och passlängden är rimlig', () => {
+    expect(L.superset).toEqual([['post', 'core']]);
+    const names = L.slots.map((x) => x.slot);
+    expect(names.indexOf('core') - names.indexOf('post')).toBe(1);
+    expect(estimateMinutes(L)).toBeGreaterThanOrEqual(35);
+    expect(estimateMinutes(L)).toBeLessThanOrEqual(50);
+  });
+});
